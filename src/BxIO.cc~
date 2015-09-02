@@ -1,0 +1,567 @@
+#include "G4ios.hh"
+#include "G4Event.hh"
+#include "G4RunManager.hh"
+#include "G4String.hh"
+
+#include "BxReadParameters.hh"
+#include "BxLogger.hh" 
+#include "BxIO.hh"
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <TFile.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <libpq-fe.h>
+#include <time.h>
+
+using namespace std;
+
+BxIO* BxIO::me = 0;
+
+// singleton
+BxIO::BxIO(){
+
+    fStreamPCFileName         = "../data/dat/PCAbsorptionLength.dat";
+    fStreamPCspectrFileName   = "../data/dat/PCEmissionSpectra.dat";
+    fStreamPCAlphadEdxFileName   = "../data/dat/alpha_in_pc_dedx.dat";
+
+    fStreamPPOFileName        = "../data/dat/PPOAbsorptionLength.dat";
+    fStreamPPOspectrFileName  = "../data/dat/PPOEmissionSpectra.dat";
+
+    fStreamDMPFileName        = "../data/dat/DMPAbsorptionLength.dat";
+
+    fStreamNylonFileName      = "../data/dat/NylonTransmittance.dat";	   
+    fStreamBxPropertyFileName = "../data/borex/BorexProperty.dat";
+
+    fStreamBxGeometryFileName= "../data/borex/BorexGeometry.dat";
+    fStreamBxPMTFileName      = "../data/borex/bx_pmtfile.inp";      
+    fStreamBxPMTVetoFileName  = "../data/borex/bx_pmtVeto.inp";
+
+    fStreamBxQEFileName       = "../data/dat/PMTQuantumEfficency.dat";	   
+    fStreamBxQEWaveFileName   = "../data/dat/PMTQuantumEfficencyWave.dat";
+
+    fStreamLGreflFileName     = "../data/dat/LightGuideReflect.dat";
+    fStreamTyvekFileName 	="../data/dat/TyvekReflectivity.dat";
+    fStreamBxSRIFileName       = "../data/dat/ScintRefractionIndex.dat";
+    fStreamQuartzRIFileName       = "../data/dat/QuartzRefractionIndex.dat";
+
+    fLightGuideShapeFileName  = "../data/borex/LightGuideBorex.dat";
+    fStreamC14CorrectionFactorFileName = "../data/dat/C14_shape_UniversalScreening.dat";
+
+}
+
+BxIO* BxIO::Get() {
+  if (!me) 
+    me = new BxIO();
+       
+  return me;
+}
+
+
+G4String BxIO::CheckFileName(G4String st) {
+    std::ifstream file;
+    std::ostringstream newfilename ; 
+    newfilename  << st << ".log"   ;
+    file.open(newfilename.str().c_str(),std::ios::in);
+    if(!file) {
+      ChangeName(st);
+      newfilename.str(""); 
+      newfilename  << st;
+    } else { 
+      file.close();
+       for(int i = 1; i< 1E4; i++) {
+        newfilename.str("");
+        newfilename  <<  st << "_v" << i << ".log"  ;
+        file.open(newfilename.str().c_str (),std::ios::in);
+        if(!file) {  
+	  newfilename.str("");
+	  newfilename  <<  st << "_v" << i;
+	  ChangeName(newfilename.str()); 
+	  BxLog(trace)  << "Output files already exist! Name changed: "<<  newfilename.str() << endl ;
+	  break ; 
+	} file.close(); 	    
+      }
+    }
+    fFileName = newfilename.str();
+    return fFileName ;
+}
+
+void BxIO::ChangeName(G4String st) {
+  std::ostringstream newfilename ;
+  
+  newfilename << st << ".log";
+  SetLogFileName(newfilename.str());   
+  
+  newfilename.str("");
+  newfilename << st << ".fil";
+  SetBinaryFileName(newfilename.str());   
+
+}
+
+
+
+//--------------------------------------------------------------
+// Binary File
+//--------------------------------------------------------------
+
+void BxIO::OpenBinaryFile(){
+     fBinaryFile.open(fBinaryFileName.c_str(),ofstream::out | ofstream::binary);
+}
+
+void BxIO::CloseBinaryFile(){
+//	fBinaryFile.flush();
+	fBinaryFile.close();
+	BxLog(routine) << "Binary File Closed" <<  endlog;      
+}
+
+
+//--------------------------------------------------------------
+// Log Files
+//--------------------------------------------------------------
+
+void BxIO::OpenLogFile() {
+  if(!fStreamLogFile.is_open()) {
+    BxLog(routine) << "Log file created " << endl ;
+    fStreamLogFile.open (fLogFileName, ofstream::out);
+    fStreamLogFile << "#############  G4Bx Log File  #############" << endl ;
+  }else
+BxLog(routine) <<"Warning: attempt to open the Log  file even if it is already opened"<<endl;
+} 
+
+void BxIO::CloseLogFile(){
+	fStreamLogFile.flush();
+	fStreamLogFile.close();
+	BxLog(routine) << "Log File Flushed And Closed" <<  endlog;      
+}
+
+//--------------------------------------------------------------
+// G4Bx File
+//--------------------------------------------------------------
+
+void BxIO::OpenG4BxFile(){
+if(!fG4BxFile.is_open()){
+     BxLog(routine) << "G4Bx File Opened" <<  endl;      
+     fG4BxFile.open(fG4BxFileName.c_str(),ifstream::in | ifstream::binary);
+}else
+     BxLog(routine) << "Warning: Attempt to open G4Bx File even if it is already opened" <<  endl;      
+
+
+}
+void BxIO::CloseG4BxFile(){
+     fG4BxFile.close();
+     BxLog(routine) << "G4Bx File Closed" <<  endlog;      
+}
+
+
+//--------------------------------------------------------------
+// Input Files
+//--------------------------------------------------------------
+
+//PC
+//Absorbtion length
+ifstream&  BxIO::GetStreamPC() {
+	if(!fStreamPC.is_open()) {
+		fStreamPC.open(fStreamPCFileName,ifstream::in);
+		if (!fStreamPC)
+	BxLog(fatal) << "Error. File " << fStreamPCFileName << " not found." << endlog;
+	}
+	if(fStreamPC.eof()) {
+		fStreamPC.close();
+		fStreamPC.clear();
+		fStreamPC.open(fStreamPCFileName,ifstream::in);
+	}
+	return fStreamPC ;
+}
+
+//PC
+//Emission Spectrum
+ifstream&  BxIO::GetStreamPCspectr() {
+  if(!fStreamPCspectr.is_open()) {
+    fStreamPCspectr.open(fStreamPCspectrFileName,ifstream::in);
+    	if (!fStreamPCspectr)
+    BxLog(fatal) << "Error. File " << fStreamPCspectrFileName << " not found." << endlog;
+	}
+  if(fStreamPCspectr.eof()) {
+    fStreamPCspectr.close();
+    fStreamPCspectr.clear();
+    fStreamPCspectr.open(fStreamPCspectrFileName,ifstream::in);
+  }
+  return fStreamPCspectr ;
+}
+
+//PC
+////Alpha dE/dx
+ifstream&  BxIO::GetStreamPCAlphadEdx() {
+	if(!fStreamPCAlphadEdx.is_open()) {
+		fStreamPCAlphadEdx.open(fStreamPCAlphadEdxFileName,ifstream::in);
+		if (!fStreamPCAlphadEdx)
+			BxLog(fatal) << "Error. File " << fStreamPCAlphadEdxFileName << " not found." << endlog;
+	}
+	if(fStreamPCAlphadEdx.eof()) {
+		fStreamPCAlphadEdx.close();
+		fStreamPCAlphadEdx.clear();
+		fStreamPCAlphadEdx.open(fStreamPCAlphadEdxFileName,ifstream::in);
+	}
+	return fStreamPCAlphadEdx;  
+}
+
+
+//PPO
+//Absorbtion length
+ifstream&  BxIO::GetStreamPPO() {
+  if(!fStreamPPO.is_open()) {
+    fStreamPPO.open(fStreamPPOFileName,ifstream::in);
+    	if (!fStreamPPO)
+    BxLog(fatal) << "Error. File " << fStreamPPOFileName << " not found." << endlog;
+	}
+  if(fStreamPPO.eof()) {
+    fStreamPPO.close();
+    fStreamPPO.clear();
+    fStreamPPO.open(fStreamPPOFileName,ifstream::in);
+  }
+  return fStreamPPO ;
+}
+
+//PPO
+//Emission Spectre
+ifstream&  BxIO::GetStreamPPOspectr() {
+  if(!fStreamPPOspectr.is_open()) {
+    fStreamPPOspectr.open(fStreamPPOspectrFileName,ifstream::in);
+    	if (!fStreamPPOspectr)
+    BxLog(fatal) << "Error. File " << fStreamPPOspectrFileName << " not found." << endlog;
+	}
+  if(fStreamPPOspectr.eof()) {
+    fStreamPPOspectr.close();
+    fStreamPPOspectr.clear();
+    fStreamPPOspectr.open(fStreamPPOspectrFileName,ifstream::in);
+  }
+  return fStreamPPOspectr ;
+}
+
+//DMP
+//Absorbtion length
+ifstream&  BxIO::GetStreamDMP() {
+  if(!fStreamDMP.is_open()) {
+    fStreamDMP.open(fStreamDMPFileName,ifstream::in);
+    	if (!fStreamDMP)
+    BxLog(fatal) << "Error. File " << fStreamDMPFileName << " not found." << endlog;
+  } if(fStreamDMP.eof()) {
+    fStreamDMP.close();
+    fStreamDMP.clear();
+    fStreamDMP.open(fStreamDMPFileName,ifstream::in);
+  }
+  return fStreamDMP ;
+}
+
+// Nylon
+ifstream&  BxIO::GetStreamNylon() {
+  if(!fStreamNylon.is_open()) {
+    fStreamNylon.open(fStreamNylonFileName,ifstream::in);
+    	if (!fStreamNylon)
+    BxLog(fatal) << "Error. File " << fStreamNylonFileName << " not found." << endlog;
+  }if(fStreamNylon.eof()) {
+    fStreamNylon.close();
+    fStreamNylon.clear();
+    fStreamNylon.open(fStreamNylonFileName,ifstream::in);
+  }
+  return fStreamNylon ;
+}
+
+// Tyvek
+ifstream&  BxIO::GetStreamTyvek() {
+  if(!fStreamTyvek.is_open()) {
+    fStreamTyvek.open(fStreamTyvekFileName,ifstream::in);
+    	if (!fStreamTyvek)
+    BxLog(fatal) << "Error. File " << fStreamTyvekFileName << " not found." << endlog;
+  }if(fStreamTyvek.eof()) {
+    fStreamTyvek.close();
+    fStreamTyvek.clear();
+    fStreamTyvek.open(fStreamTyvekFileName,ifstream::in);
+  }
+  return fStreamTyvek ;
+}
+
+// PMTs in Inner Detector
+ifstream&  BxIO::GetStreamBxPMT() {
+  if(!fStreamBxPMT.is_open()) {
+    fStreamBxPMT.open(fStreamBxPMTFileName,ifstream::in);
+    	if (!fStreamBxPMT)
+    BxLog(fatal) << "Error. File " << fStreamBxPMTFileName << " not found." << endlog;
+  }if(fStreamBxPMT.eof()) {
+    fStreamBxPMT.close();
+    fStreamBxPMT.clear();
+    fStreamBxPMT.open(fStreamBxPMTFileName,ifstream::in);
+  }
+  return fStreamBxPMT ;
+}
+
+// PMTs Relative QE in Inner Detector
+ifstream&  BxIO::GetStreamBxPMTRelQE() {
+  if(!fStreamBxPMTRelQE.is_open()) {
+    fStreamBxPMTRelQE.open(fStreamBxPMTRelQEFileName,ifstream::in);
+    	if (!fStreamBxPMTRelQE)
+    BxLog(fatal) << "Error. File " << fStreamBxPMTRelQEFileName << " not found." << endlog;
+  BxLog(routine) << "Effective QE file \"" << fStreamBxPMTRelQEFileName << "\" opened" << endlog;
+  }if(fStreamBxPMTRelQE.eof()) {
+    fStreamBxPMTRelQE.close();
+    fStreamBxPMTRelQE.clear();
+    fStreamBxPMTRelQE.open(fStreamBxPMTRelQEFileName,ifstream::in);
+  }
+  return fStreamBxPMTRelQE ;
+}
+
+// PMTs in Outer Detector
+ifstream&  BxIO::GetStreamBxPMTVeto() {
+  if(!fStreamBxPMTVeto.is_open()) {
+    fStreamBxPMTVeto.open(fStreamBxPMTVetoFileName,ifstream::in);
+    	if (!fStreamBxPMTVeto)
+    BxLog(fatal) << "Error. File " << fStreamBxPMTVetoFileName << " not found." << endlog;
+  }if(fStreamBxPMTVeto.eof()) {
+    fStreamBxPMTVeto.close();
+    fStreamBxPMTVeto.clear();
+    fStreamBxPMTVeto.open(fStreamBxPMTVetoFileName,ifstream::in);
+  }
+  return fStreamBxPMTVeto ;
+}
+
+
+// BxProperty
+ifstream&  BxIO::GetStreamBxProperty() {
+  if(!fStreamBxProperty.is_open()) {
+    fStreamBxProperty.open(fStreamBxPropertyFileName,ifstream::in);
+    	if (!fStreamBxProperty)
+    BxLog(fatal) << "Error. File " << fStreamBxPropertyFileName << " not found." << endlog;
+  } if(fStreamBxProperty.eof()) {
+    fStreamBxProperty.close();
+    fStreamBxProperty.clear();
+    fStreamBxProperty.open(fStreamBxPropertyFileName,ifstream::in);
+  }
+  return fStreamBxProperty ;
+}
+
+//BxGeometry
+ifstream&  BxIO::GetStreamBxGeometry() {
+  if(!fStreamBxGeometry.is_open()) {
+    fStreamBxGeometry.open(fStreamBxGeometryFileName,ifstream::in);
+    	if (!fStreamBxGeometry)
+    BxLog(fatal) << "Error. File " << fStreamBxGeometryFileName << " not found." << endlog;
+  } if(fStreamBxGeometry.eof()) {
+    fStreamBxGeometry.close();
+    fStreamBxGeometry.clear();
+    fStreamBxGeometry.open(fStreamBxGeometryFileName,ifstream::in);
+  }
+  return fStreamBxGeometry ;
+}
+
+// BxQE
+ifstream&  BxIO::GetStreamBxQE() {
+  if(!fStreamBxQE.is_open()) {
+    fStreamBxQE.open(fStreamBxQEFileName,ifstream::in);
+    	if (!fStreamBxQE)
+    BxLog(fatal) << "Error. File " << fStreamBxQEFileName << " not found." << endlog;
+  }if(fStreamBxQE.eof()) {
+    fStreamBxQE.close();
+    fStreamBxQE.clear();
+    fStreamBxQE.open(fStreamBxQEFileName,ifstream::in);
+  }
+  return fStreamBxQE ;
+}
+
+// BxQEWave
+
+ifstream&  BxIO::GetStreamBxQEWave() {
+  if(!fStreamBxQEWave.is_open()) {
+    fStreamBxQEWave.open(fStreamBxQEWaveFileName,ifstream::in);
+    	if (!fStreamBxQEWave)
+    BxLog(fatal) << "Error. File " << fStreamBxQEWaveFileName << " not found." << endlog;
+  }
+  if(fStreamBxQEWave.eof()) {
+    fStreamBxQEWave.close();
+    fStreamBxQEWave.clear();
+    fStreamBxQEWave.open(fStreamBxQEWaveFileName,ifstream::in);
+  }
+  return fStreamBxQEWave ;
+}
+
+// LGReflectivity
+
+ifstream&  BxIO::GetStreamLGrefl() {
+  if(!fStreamLGrefl.is_open()) {
+    fStreamLGrefl.open(fStreamLGreflFileName,ifstream::in);
+    	if (!fStreamLGrefl)
+    BxLog(fatal) << "Error. File " << fStreamLGreflFileName << " not found." << endlog;
+  }
+  if(fStreamLGrefl.eof()) {
+    fStreamLGrefl.close();
+    fStreamLGrefl.clear();
+    fStreamLGrefl.open(fStreamLGreflFileName,ifstream::in);
+  }
+  return fStreamLGrefl ;
+}
+
+//LG Shape
+ifstream&  BxIO::GetStreamLightGuideShape() {
+  if(!fStreamLightGuideShape.is_open()) {
+    fStreamLightGuideShape.open(fLightGuideShapeFileName,ifstream::in);
+    	if (!fStreamLightGuideShape)
+    BxLog(fatal) << "Error. File " << fLightGuideShapeFileName << " not found." << endlog;
+  }
+  if(fStreamLightGuideShape.eof()) {
+    fStreamLightGuideShape.close();
+    fStreamLightGuideShape.clear();
+    fStreamLightGuideShape.open(fLightGuideShapeFileName,ifstream::in);
+  }
+  return fStreamLightGuideShape ;
+}
+
+
+// ScintRefractionIndex
+ifstream&  BxIO::GetStreamBxSRI() {
+  if(!fStreamBxSRI.is_open()) {
+    fStreamBxSRI.open(fStreamBxSRIFileName,ifstream::in);
+    	if (!fStreamBxSRI)
+    BxLog(fatal) << "Error. File " << fStreamBxSRIFileName << " not found." << endlog;
+  }
+  if(fStreamBxSRI.eof()) {
+    fStreamBxSRI.close();
+    fStreamBxSRI.clear();
+    fStreamBxSRI.open(fStreamBxSRIFileName,ifstream::in);
+  }
+  return fStreamBxSRI ;
+}
+
+
+// QuartzRefractionIndex
+ifstream&  BxIO::GetStreamQuartzRI() {
+  if(!fStreamQuartzRI.is_open()) {
+    fStreamQuartzRI.open(fStreamQuartzRIFileName,ifstream::in);
+    	if (!fStreamQuartzRI)
+    BxLog(fatal) << "Error. File " << fStreamQuartzRIFileName << " not found." << endlog;
+  }
+  if(fStreamQuartzRI.eof()) {
+    fStreamQuartzRI.close();
+    fStreamQuartzRI.clear();
+    fStreamQuartzRI.open(fStreamQuartzRIFileName,ifstream::in);
+  }
+  return fStreamQuartzRI ;
+}
+
+
+void BxIO::QueryDB_Dst_RelQE(){
+
+    fDstFileName="/storage/gpfs_data/borexino/dst/cycle_17/";
+    fStreamBxPMTRelQEFileName="../data/borex/relQE_ASCII/relQE_";
+
+/* PGconn          *conn;
+ PGresult        *res;
+ conn = PQconnectdb("dbname=bx_runvalidation host=bxdb.lngs.infn.it user=borex_guest password=xyz");
+       
+ if (PQstatus(conn) == CONNECTION_BAD) BxLog(fatal) << "Impossible to connect to database bx_runvalidation." << endlog;
+		    
+ std::ostringstream stream;
+stream << BxReadParameters::Get()->GetRunNumber();
+G4String command="SELECT \"RunDate\" FROM \"ValidRuns\" WHERE \"RunNumber\"="+stream.str()+";";
+stream.str("");
+res=PQexec (conn,command.c_str());
+
+ if (PQresultStatus(res) != PGRES_TUPLES_OK ) BxLog(fatal) << "No data from database bx_runvalidation." << endlog;
+
+ G4int cont=0;
+ while (PQgetisnull(res,0,0)) {
+ stream << BxReadParameters::Get()->GetRunNumber()-cont;
+ BxLog(warning) << "Warning. The run you are looking for (" << stream.str() << ") is not present in bx_runvalidation database (not validated?). Looking for an older one." << endlog;
+ command="SELECT \"RunDate\" FROM \"ValidRuns\" WHERE \"RunNumber\"="+stream.str()+";";
+ res=PQexec (conn,command.c_str());
+ cont++;
+ stream.str("");
+ }
+
+ if (cont==0){
+	 stream << BxReadParameters::Get()->GetRunNumber();
+	 BxLog(routine) << "Run number " << stream.str() << " found in validated run database." << endlog;
+} else {
+	BxLog(routine) << "Run number " << stream.str() << " NOT found in validated run database." << endlog;
+        stream.str("");
+	stream << BxReadParameters::Get()->GetRunNumber()-cont;
+	BxLog(routine) << "The dst file related to run number " << stream.str() << " was used instead." << endlog;
+        G4int new_run=BxReadParameters::Get()->GetRunNumber()-cont;
+        BxReadParameters::Get()->SetRunNumber(new_run);
+}
+
+G4String query;
+query=PQgetvalue(res,0,0);
+PQclear(res);
+PQfinish(conn);
+struct tm *run_time=new struct tm;
+G4String array[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+ 
+ run_time->tm_year=atoi(query.substr(0,query.find("-")).c_str())-1900;
+ query.erase(0, query.find("-") + 1);
+ run_time->tm_mon=atoi(query.substr(0,query.find("-")).c_str())-1;
+ query.erase(0, query.find("-") + 1);
+ run_time->tm_mday=atoi(query.substr(0,query.find(" ")).c_str());
+ query.erase(0, query.find(" ") + 1);
+ run_time->tm_hour=atoi(query.substr(0,query.find(":")).c_str());
+ query.erase(0, query.find(":") + 1);
+ run_time->tm_min=atoi(query.substr(0,query.find(":")).c_str());
+ query.erase(0, query.find(":") + 1);
+ run_time->tm_sec=atoi(query.c_str());
+ mktime(run_time);
+ 
+ time_t raw_seconds = mktime(run_time);
+ raw_seconds-=60*(run_time->tm_min+60*(24*run_time->tm_wday+run_time->tm_hour))-4800;
+		        
+ run_time=localtime(&raw_seconds);
+
+//fare file name del dst
+stream.str("");
+ stream << (run_time->tm_year+1900);
+fDstFileName=fDstFileName+stream.str()+"/dst_"+stream.str()+"_"+array[run_time->tm_mon]+"_";
+fStreamBxPMTRelQEFileName=fStreamBxPMTRelQEFileName+stream.str()+"_"+array[run_time->tm_mon]+"_";
+
+stream.str("");
+if (run_time->tm_mday<10)
+	stream << "0" << run_time->tm_mday;
+else
+	stream << run_time->tm_mday;
+*/
+//fDstFileName=fDstFileName+stream.str()+"_c17.root";
+//fStreamBxPMTRelQEFileName=fStreamBxPMTRelQEFileName+stream.str()+".dat.hole";
+
+//if (BxReadParameters::Get()->GetRunNumber()<5647){
+BxLog(warning) << "Run too old! The Effective QE file of run 5647 was used instead." << endlog;
+	fStreamBxPMTRelQEFileName="../data/borex/relQE_ASCII/relQE_2007_Aug_05.dat.hole";
+	BxLog(warning) << "Run too old! The Effective QE file of run 5647 was used instead." << endlog;
+//}else if (BxReadParameters::Get()->GetRunNumber()>24225){
+//	fStreamBxPMTRelQEFileName="../data/borex/relQE_ASCII/relQE_2015_Mar_22.dat.hole";
+//	BxLog(warning) << "Run too new! The Effective QE file of run 24225 was used instead." << endlog;
+	BxLog(warning) << "It's time to update the relQE_ASCII folder!" << endlog;
+//}
+}
+
+
+//TFile* BxIO::GetStreamDst(){
+//	fStreamDst= new TFile(fDstFileName.c_str());
+//if (fStreamDst->IsZombie())   BxLog(warning) << "Warning. Dst file not found." << endlog;
+//	return fStreamDst;
+}
+
+
+/*
+//C14 correction 
+ifstream&  BxIO::GetStreamC14CorrectionFactor() {
+  if(!fStreamC14CorrectionFactor.is_open()) {
+    fStreamC14CorrectionFactor.open(fStreamC14CorrectionFactorFileName,ifstream::in);
+        if (!fStreamC14CorrectionFactor)
+    BxLog(fatal) << "Error. File " << fStreamC14CorrectionFactorFileName << " not found." << endlog;
+  }
+  if(fStreamC14CorrectionFactor.eof()) {
+    fStreamC14CorrectionFactor.close();
+    fStreamC14CorrectionFactor.clear();
+    fStreamC14CorrectionFactor.open(fStreamC14CorrectionFactorFileName,ifstream::in);
+  }
+  return fStreamC14CorrectionFactor ;
+}
+*/
+

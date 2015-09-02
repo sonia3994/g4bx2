@@ -1,0 +1,1136 @@
+//Created by D. Franco
+//Revised by A. Caminata and S. Marcocci, Sept. 2014
+#include "BxReadParameters.hh"
+#include "BxPropertyCollection.hh"
+#include "BxLogger.hh"
+#include "BxIO.hh"
+#include "G4SystemOfUnits.hh"
+using namespace std;
+
+BxPropertyCollection* BxPropertyCollection:: me=0;
+
+BxPropertyCollection::BxPropertyCollection() { 
+	BxIO::Get()->QueryDB_Dst_RelQE();     //do not remove or move this line, otherwise dst and relQE files won't be found
+	if (!ReadProperties()) {
+    BxLog(error) << "Unable to load medium parameters!" << endlog;
+  }
+  fPhysicsTable = NULL;
+
+
+}
+
+BxPropertyCollection::~BxPropertyCollection(){
+
+  if(fPhysicsTable != NULL)	{
+	fPhysicsTable->clearAndDestroy();
+	delete fPhysicsTable;
+  }
+}
+
+BxPropertyCollection* BxPropertyCollection::Get() {
+  if (!me)
+    me = new BxPropertyCollection();
+  return me;
+}
+
+
+bool BxPropertyCollection::ReadProperties() {
+  G4double thePhEnergy,thePhWaveLength;
+  G4int theNum = 2;
+  G4String st;
+  G4double  theEmissionSpectra;
+  G4double  thePMTQuantumEfficiencyWave, thePMTQuantumEfficiency;
+  G4double  dummy;
+
+  //////////////////////////////////////////
+  //       Loading PC Properties          //
+  //////////////////////////////////////////
+
+  //---------Absorption Length------
+
+  G4int i_dim = 0;
+  fPCAbsorptionLength.allocate(1000);
+  fPCScatteringLength.allocate(1000);
+  G4double PCfactor = BxReadParameters::Get()->GetPCAttenuationLengthFactor();
+  while (BxIO::Get()->GetStreamPC() >> thePCAbsorptionLength) {
+	  if(i_dim + 70 < 310) {
+		  fPCAbsorptionLength[i_dim] = (0.01/(1.0 * 7.29 * thePCAbsorptionLength * log(10.))) * m;
+		  fPCScatteringLength[i_dim] = 1.e6*m;
+	  } else {
+		  fPCAbsorptionLength[i_dim] = 1.e6*m; 
+		  fPCScatteringLength[i_dim] = (0.01/(1.0 * 7.29 * thePCAbsorptionLength * log(10.))) * m; 
+		  fPCScatteringLength[i_dim] *= PCfactor;  
+	  }
+
+	  BxLog(debugging) << "thePCAbsorptionLength ="<<thePCAbsorptionLength<< endlog; 
+	  BxLog(debugging) << "thePCScatteringLength ="<<thePCScatteringLength<< endlog; 
+	  i_dim++;
+  }
+  fPCAbsorptionLength.reallocate(i_dim);
+  fPCScatteringLength.reallocate(i_dim);
+  theNum = i_dim;
+  fPhotonEnergyPCAb.allocate(theNum);
+  for(G4int i=0;i<theNum;i++)	{
+	  thePhotonWaveLength = 70 + i;
+	  thePhotonEnergy = (h_Planck*c_light)/(thePhotonWaveLength*1E-6)*1E6;
+	  thePhotonEnergy *= eV;
+	  fPhotonEnergyPCAb[i] = thePhotonEnergy;
+  }
+  //---------Emission Spectra--------
+  fPCEmissionSpectra.allocate(1000);
+  i_dim = 0;  
+  while (BxIO::Get()->GetStreamPCspectr() >> theEmissionSpectra)
+  {
+    fPCEmissionSpectra[i_dim] = theEmissionSpectra;
+    i_dim++;
+  }  
+  fPCEmissionSpectra.reallocate(i_dim);
+
+  theNum = i_dim;
+  fPhotonEnergyPCEm.allocate(theNum);
+  for(G4int i=0;i<theNum;i++)	{			
+    thePhotonWaveLength = 270 + i;		
+    thePhotonEnergy = (h_Planck*c_light)/(thePhotonWaveLength*1E-6)*1E6;
+    thePhotonEnergy *= eV;
+    fPhotonEnergyPCEm[i] = thePhotonEnergy;
+  }
+
+  //---------Reemission Probability--------------------
+
+  theNum = 2;
+  fPCReemissionProbability.allocate(theNum);
+
+  while (getline (BxIO::Get()->GetStreamBxProperty(), st ) ) {
+    if (!st.find("ReemissionProbabilityPC")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++) {
+        fPCReemissionProbability[i] = value;
+      }
+    }
+  }
+
+    fPhotonEnergyPCReemProb.allocate(theNum);
+
+  // Igor: the photon energy range in order
+  //       to fix the annoying warning problem
+  //       should be the same for all materials
+  //       Now it is fixed by water data fom SuperK
+  //       1.77120*eV - 5.63565**eV   
+  //       1.23780*eV - 12.378**eV    (modified by Y.Koshio for the range between 100nm and 1000nm)
+  
+  thePhotonEnergy = 1.2378*eV ;
+  fPhotonEnergyPCReemProb[0] = thePhotonEnergy;
+  thePhotonEnergy = 17*eV ;
+  fPhotonEnergyPCReemProb[1] = thePhotonEnergy;
+
+  //---------Refraction Index-------
+  //
+  // Same as PC+PPO temporary by Y.Koshio
+  //
+  
+
+  // Igor: the photon energy range in order
+  //       to fix the annoying warning problem
+  //       should be the same for all materials
+  
+
+  fPhotonEnergyPCRef.allocate(1000);
+  fPCRefractionIndex.allocate(1000);
+
+  i_dim = 0;
+  while (BxIO::Get()->GetStreamBxSRI() >> thePhotonWaveLength >> theScintRefractionIndex ) {
+    thePhotonEnergy = 1E+6*
+      (h_Planck*c_light)/(thePhotonWaveLength);
+    thePhotonEnergy *= MeV;
+    fPhotonEnergyPCRef[i_dim] = thePhotonEnergy;
+    fPCRefractionIndex[i_dim] = theScintRefractionIndex;
+
+    //BxLog(debugging) << i_dim << " " << thePhotonWaveLength << " " << thePhotonEnergy << " " << theScintRefractionIndex << endlog;
+
+    i_dim++;
+  }
+
+  fPhotonEnergyPCRef.reallocate(i_dim);
+  fPCRefractionIndex.reallocate(i_dim);
+
+
+  //////////////////////////////////////////
+  //       Loading PPO Properties         //
+  //////////////////////////////////////////
+
+  //---------Absorption Length------
+
+  i_dim = 0;
+  fPPOAbsorptionLength.allocate(1000);
+  G4double PPOfactor = BxReadParameters::Get()->GetPPOAttenuationLengthFactor();
+  while (BxIO::Get()->GetStreamPPO() >> thePPOAbsorptionLength) {
+ thePPOAbsorptionLength = (0.01/(1.0 * 6.75E-3 *
+	    thePPOAbsorptionLength * log(10.))) * m; 
+    //BxLog(debugging) << "thePPOAbsorptionLength ="<<thePPOAbsorptionLength<< endlog; 
+    thePPOAbsorptionLength *= PPOfactor;
+    fPPOAbsorptionLength[i_dim]= thePPOAbsorptionLength;
+    i_dim++;
+  }
+  fPPOAbsorptionLength.reallocate(i_dim);
+  
+  theNum = i_dim;
+  fPhotonEnergyPPOAb.allocate(theNum);
+  for(G4int i=0;i<theNum;i++)	{
+    thePhotonWaveLength = 70 + i;
+    thePhotonEnergy = (h_Planck*c_light)/(thePhotonWaveLength*1E-6)*1E6;
+    thePhotonEnergy *= eV;
+    fPhotonEnergyPPOAb[i] = thePhotonEnergy;
+  }
+
+  //---------Emission Spectra--------
+
+  fPPOEmissionSpectra.allocate(1000);
+  i_dim = 0;  
+  while (BxIO::Get()->GetStreamPPOspectr() >> theEmissionSpectra)
+  {
+    fPPOEmissionSpectra[i_dim] = theEmissionSpectra;
+    i_dim++;
+  }  
+  fPPOEmissionSpectra.reallocate(i_dim);
+
+  theNum = i_dim;
+  fPhotonEnergyPPOEm.allocate(theNum);
+  for(G4int i=0;i<theNum;i++)	{			
+    thePhotonWaveLength = 310 + i;		
+    thePhotonEnergy = (h_Planck*c_light)/(thePhotonWaveLength*1E-6)*1E6;
+    thePhotonEnergy *= eV;
+    fPhotonEnergyPPOEm[i] = thePhotonEnergy;
+  }
+
+  //---------Reemission Probability--------------------
+ 
+
+// According to measurements from KamLand, the Reemission Probability is lower at high wavelength.
+//In this model, 2 Reemission Probability are used: 0.839 for lambda <375 nm, 0.15 for lambda > 375 nm
+// S. Davini
+
+  G4double ReemissionProbPPOLowWl, ReemissionProbPPOHighWl, ReemissionProbPPOThrWl,  ReemissionProbXWl, ReemissionProbXThWl;
+ReemissionProbXWl=BxReadParameters::Get()->GetPPOAbsReemProbXRays();
+ReemissionProbXThWl=BxReadParameters::Get()->GetPPOAbsReemProbXRaysTh();
+//G4cout<<"ReemissionProbXWl= "<<ReemissionProbXWl<<"ReemissionProbXThWl= "<<ReemissionProbXThWl<<G4endl;
+  while (getline (BxIO::Get()->GetStreamBxProperty(), st) ) {
+	  //if (!st.find("ReemissionProbabilityXWl")) 
+	//	  ReemissionProbXWl = atof(st.substr(st.find("=")+1).c_str());
+//	  if (!st.find("ReemissionProbabilityXThWl")) 
+//		  ReemissionProbXThWl = atof(st.substr(st.find("=")+1).c_str());
+	  if (!st.find("ReemissionProbabilityPPOLowWl")) 
+		  ReemissionProbPPOLowWl = atof(st.substr(st.find("=")+1).c_str());
+	  if (!st.find("ReemissionProbabilityPPOHighWl")) 
+		  ReemissionProbPPOHighWl = atof(st.substr(st.find("=")+1).c_str());
+	  if (!st.find("ReemissionProbabilityPPOThrWl")) 
+		  ReemissionProbPPOThrWl = atof(st.substr(st.find("=")+1).c_str());
+	}
+
+  fPhotonEnergyPPOReemProb.allocate(1000);
+  fPPOReemissionProbability.allocate(1000);
+  i_dim = 0;
+  while (BxIO::Get()->GetStreamBxSRI() >> thePhotonWaveLength >> dummy) {
+	  thePhotonEnergy = 1E+6*
+		  (h_Planck*c_light)/(thePhotonWaveLength);
+	  thePhotonEnergy *= MeV;
+	  fPhotonEnergyPPOReemProb[i_dim]  = thePhotonEnergy;
+if(thePhotonWaveLength<ReemissionProbXThWl){
+fPPOReemissionProbability[i_dim]=ReemissionProbXWl;
+}else{
+	  fPPOReemissionProbability[i_dim] = (thePhotonWaveLength < ReemissionProbPPOThrWl) ? ReemissionProbPPOLowWl : ReemissionProbPPOHighWl;
+}
+	  //BxLog(debug) << i_dim << " " << thePhotonWaveLength << " " << fPPOReemissionProbability[i_dim] << endlog;
+
+	  i_dim++;
+  }
+
+  fPhotonEnergyPPOReemProb.reallocate(i_dim);
+  fPPOReemissionProbability.reallocate(i_dim);
+
+
+  // Igor: the photon energy range in order
+  //       to fix the annoying warning problem
+  //       should be the same for all materials
+  //       Now it is fixed by water data fom SuperK
+  //       1.77120*eV - 5.63565**eV   
+  //       1.23780*eV - 12.378**eV    (modified by Y.Koshio for the range between 100nm and 1000nm)
+  
+
+
+  //////////////////////////////////////////
+  //       Loading DMP Properties          //
+  //////////////////////////////////////////
+
+  //---------Absorption Length------
+
+  i_dim = 0;
+  fDMPAbsorptionLength.allocate(1000);
+  G4double DMPfactor =  BxReadParameters::Get()->GetDMPAttenuationLengthFactor(); 
+  
+  while (BxIO::Get()->GetStreamDMP() >> theDMPAbsorptionLength) {
+    theDMPAbsorptionLength = (0.01/(2.57E-2 *
+	    theDMPAbsorptionLength * log(10.))) * m;
+    //BxLog(debugging) << "theDMPAbsorptionLength ="<<theDMPAbsorptionLength<< endlog; 
+    theDMPAbsorptionLength *= DMPfactor;
+    fDMPAbsorptionLength[i_dim]= theDMPAbsorptionLength;
+    i_dim++;
+  }
+  fDMPAbsorptionLength.reallocate(i_dim);
+
+  
+  theNum = i_dim;
+  fPhotonEnergyDMPAb.allocate(theNum);
+  for(G4int i=0;i<theNum;i++)	{
+    thePhotonWaveLength = 70 + i;
+    thePhotonEnergy = (h_Planck*c_light)/(thePhotonWaveLength*1E-6)*1E6;
+    thePhotonEnergy *= eV;
+    fPhotonEnergyDMPAb[i] = thePhotonEnergy;
+  }
+
+  ////////////////////////////////////////////////////////
+  //       Loading Scintillator and PC refraction Index //
+  ////////////////////////////////////////////////////////
+  
+    //---------Refraction Index-------
+
+
+  // Igor: the photon energy range in order
+  //       to fix the annoying warning problem
+  //       should be the same for all materials
+  
+
+  fPhotonEnergyScintRef.allocate(1000);
+  fScintRefractionIndex.allocate(1000);
+
+  i_dim = 0;
+  while (BxIO::Get()->GetStreamBxSRI() >> thePhotonWaveLength >> theScintRefractionIndex ) {
+    thePhotonEnergy = 1E+6*
+      (h_Planck*c_light)/(thePhotonWaveLength);
+    thePhotonEnergy *= MeV;
+    fPhotonEnergyScintRef[i_dim] = thePhotonEnergy;
+    fScintRefractionIndex[i_dim] = theScintRefractionIndex;
+
+    //BxLog(debugging) << i_dim << " " << thePhotonWaveLength << " " << thePhotonEnergy << " " << theScintRefractionIndex << endlog;
+
+    i_dim++;
+  }
+
+  fPhotonEnergyScintRef.reallocate(i_dim);
+  fScintRefractionIndex.reallocate(i_dim);
+
+
+  ////////////////////////////////////////////////////
+  //        Loading Tyvek Properties                // 
+  ////////////////////////////////////////////////////
+ 
+  //Photon Energy----------------------------
+ 
+  fPhotonEnergyTyvek.allocate(1000);
+  fTyvekReflectivity.allocate(1000);
+
+  i_dim = 0;
+  G4double theTyvekReflectivity;
+  while (BxIO::Get()->GetStreamTyvek() >> thePhotonEnergy >> theTyvekReflectivity ) {
+    thePhotonEnergy *= eV;
+    fPhotonEnergyTyvek[i_dim] = thePhotonEnergy;
+    fTyvekReflectivity[i_dim] = theTyvekReflectivity;
+    i_dim++;
+  }
+
+  fPhotonEnergyTyvek.reallocate(i_dim);
+  fTyvekReflectivity.reallocate(i_dim);
+
+ theNum=2;
+ fTyvekEfficiency.allocate(theNum);
+ fTyvekspecLOBE.allocate(theNum);
+ fTyvekspecSPIKE.allocate(theNum);
+ fTyvekbackSCATT.allocate(theNum);
+
+	 for (G4int i=0; i<theNum; i++){
+ fTyvekEfficiency[i]=0.0;
+ fTyvekspecLOBE[i]=0.0;
+ fTyvekspecSPIKE[i]=0.0;
+ fTyvekbackSCATT[i]=0.0;
+	 }
+    
+
+
+  ////////////////////////////////////////////////////
+  //        Loading Nylon Properties                // 
+  ////////////////////////////////////////////////////
+  
+  //---------Absorption Length--------
+
+
+  G4double Nylonfactor =  BxReadParameters::Get()->GetNylonAttenuationLengthFactor();
+
+  fNylonAbsorptionLength.allocate(1000);
+  i_dim = 0;
+  while (BxIO::Get()->GetStreamNylon() >> theNylonAbsorptionLength) {
+    theNylonAbsorptionLength = 125.0*1E-4/(-1.0*log(theNylonAbsorptionLength/100.0));
+    //BxLog(debugging) << "theNylonAbsorptionLength ="<<theNylonAbsorptionLength<< endlog;
+    theNylonAbsorptionLength*=Nylonfactor;
+    theNylonAbsorptionLength *= cm;
+    fNylonAbsorptionLength[i_dim] = theNylonAbsorptionLength;
+    i_dim++;
+  }
+  fNylonAbsorptionLength.reallocate(i_dim);
+    
+  theNum = i_dim;
+  fPhotonEnergyNylonAb.allocate(theNum);
+  for(G4int i=0;i<theNum;i++)	{
+    thePhotonWaveLength = 100 + i;
+    thePhotonEnergy =1E+6*(h_Planck*c_light)/(thePhotonWaveLength);
+    thePhotonEnergy *= MeV;
+    fPhotonEnergyNylonAb[i] = thePhotonEnergy;
+  }
+  
+  
+  //---------Refraction Index---------
+  //
+  //
+
+  theNum = 2;
+  fNylonRefractionIndex.allocate(theNum);
+  
+
+  while (getline (BxIO::Get()->GetStreamBxProperty(), st ) ) {
+    if (!st.find("RindexNylon")) {
+     G4double value = atof(st.substr(st.find("=")+1).c_str());
+     for(G4int i=0;i<theNum;i++)
+  fNylonRefractionIndex[i] = value;
+    }
+  }
+
+  fPhotonEnergyNylonRef.allocate(theNum);
+  
+  thePhotonEnergy = 1.77120*eV ;
+  fPhotonEnergyNylonRef[0] = thePhotonEnergy;
+  
+  thePhotonEnergy =  12.3*eV;//5.63565*eV ;
+  fPhotonEnergyNylonRef[1] = thePhotonEnergy;
+  
+ /* 
+  // Same as PC+PPO temporary by Y.Koshio
+  
+  fPhotonEnergyNylonRef.allocate(1000);
+  fNylonRefractionIndex.allocate(1000);
+
+  i_dim = 0;
+  while (BxIO::Get()->GetStreamBxSRI() >> thePhotonWaveLength >> theScintRefractionIndex ) {
+    thePhotonEnergy = 1E+6*
+      (h_Planck*c_light)/(thePhotonWaveLength);
+    thePhotonEnergy *= MeV;
+    fPhotonEnergyNylonRef[i_dim] = thePhotonEnergy;
+    fNylonRefractionIndex[i_dim] = theScintRefractionIndex;
+
+    //BxLog(debugging) << i_dim << " " << thePhotonWaveLength << " " << thePhotonEnergy << " " << theScintRefractionIndex << endlog;
+
+    i_dim++;
+  }
+
+  fPhotonEnergyNylonRef.reallocate(i_dim);
+  fNylonRefractionIndex.reallocate(i_dim);
+
+*/
+
+  ////////////////////////////////////////////////////
+  //        Loading Glass Properties                // 
+  ////////////////////////////////////////////////////
+  
+
+  //---------Absorption Length--------
+
+  theNum = 2;
+  fGlassAbsorptionLength.allocate(theNum);
+  while (getline (BxIO::Get()->GetStreamBxProperty(), st ) ) {
+    if (!st.find("GlassAbsorptionLength")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	fGlassAbsorptionLength[i] = value; 
+    }
+  }
+  fPhotonEnergyGlassAb.allocate(theNum);
+
+  //---------Refraction Index---------
+  // Data from Kitamura et al, "Optical constants of silica glass from extreme ultraviolet
+  // to far infrared at near room temperature" APPLIED OPTICS Vol. 46, No. 33
+
+  fGlassRefractionIndex.allocate(1000);
+  fPhotonEnergyGlassRef.allocate(1000);
+  i_dim=0;
+  while (BxIO::Get()->GetStreamQuartzRI()>>thePhotonWaveLength>>theGlassRefractionIndex ) {
+	  thePhotonEnergy = 1E+6*
+		  (h_Planck*c_light)/(thePhotonWaveLength);
+	  thePhotonEnergy *= MeV;
+	  fPhotonEnergyGlassRef[i_dim] = thePhotonEnergy;
+	  fGlassRefractionIndex[i_dim] = theGlassRefractionIndex;
+	  i_dim++;
+  }
+fPhotonEnergyGlassRef.reallocate(i_dim);
+fGlassRefractionIndex.reallocate(i_dim);
+
+
+  // Igor: the photon energy range in order
+  //       to fix the annoying warning problem
+  //       should be the same for all materials
+  //       Now it is fixed by water data from SuperK
+  //       1.77120*eV - 5.63565*eV  
+  //       1.23780*eV - 12.378**eV    (modified by Y.Koshio for the range between 100nm and 1000nm)
+
+  thePhotonEnergy = 1.2378 * eV;
+  fPhotonEnergyGlassAb[0] = thePhotonEnergy;
+//  fPhotonEnergyGlassRef[0] = thePhotonEnergy;
+
+  thePhotonEnergy = 17 * eV;
+  fPhotonEnergyGlassAb[1] = thePhotonEnergy;
+//  fPhotonEnergyGlassRef[1] = thePhotonEnergy;		        
+
+  //---------Loading PMT - HoleChannel Map - for Inner Detector-----------------------
+
+  G4int    theChannelNumber;       
+  G4int NumberOfChannels = 0;
+  fChannelNumber.allocate(4000);
+
+  while(BxIO::Get()->GetStreamBxPMT()>> dummy >> dummy >> theChannelNumber >> dummy >> dummy >> dummy >> dummy>> dummy >> dummy >> dummy >> dummy) {
+    fChannelNumber[NumberOfChannels] = theChannelNumber;
+    BxLog(debugging) << "ElectronicChannel for Inner Detector loaded =" << NumberOfChannels <<endlog;
+    NumberOfChannels++;
+  }
+
+  fChannelNumber.reallocate(NumberOfChannels);
+  BxLog(trace) << "PMT-HoleChannel Map loaded for Inner Detector" << endlog;
+  BxLog(trace) << "Number of Hole Channels for Inner Detector= " << NumberOfChannels << endlog;
+
+  //--END OF PMT - ElectronicChannel Map - for Inner Detector------------------------------
+
+  //---------Loading PMT - HoleChannel Map - for Outer Detector-----------------------
+           
+  NumberOfChannels=0;
+  fChannelNumberOD.allocate(4000);
+
+  while(BxIO::Get()->GetStreamBxPMTVeto()>> dummy >> theChannelNumber >> dummy >> dummy >> dummy >> dummy) {
+    fChannelNumberOD[NumberOfChannels] = theChannelNumber;
+    BxLog(debugging) << "ElectronicChannel for Outer Detector loaded =" << NumberOfChannels <<endlog;
+    NumberOfChannels++;
+  }
+
+  fChannelNumberOD.reallocate(NumberOfChannels);
+  BxLog(trace) << "PMT-HoleChannel Map loaded for Outer Detector loaded" << endlog;
+  BxLog(trace) << "Number of Hole Channels for Outer Detector= " << NumberOfChannels << endlog;
+
+  //--END OF PMT - ElectronicChannel Map - for Outer Detector------------------------------
+
+
+  ////////////////////////////////////////////////////////////////////////////
+  //        Loading Relative PMT Quantum Efficiency for Inner Detector      //
+  ////////////////////////////////////////////////////////////////////////////
+
+
+  //       It gives the relative quantum efficiency of the photocathode of the
+  //       Thorn EMI 9351 photomultiplie
+
+  G4double theChannelRelQE;
+ // G4double theSumChannelRelQE;
+
+  NumberOfChannels=0;
+ // theSumChannelRelQE = 0;
+
+  G4int RelQEflag =  BxReadParameters::Get()->GetRelPMTQEflag();
+  fChannelRelQE.allocate(4000);
+
+  while(BxIO::Get()->GetStreamBxPMTRelQE()>> dummy >> theChannelRelQE) {
+    if (RelQEflag == 1) fChannelRelQE[NumberOfChannels] = theChannelRelQE;
+    else fChannelRelQE[NumberOfChannels] = 1.0;
+   BxLog(debugging) << "PMT-Relative Quantum Efficiency Map loaded for Inner Detector  =" << NumberOfChannels <<endlog;
+    NumberOfChannels++;
+  }
+
+  fChannelRelQE.reallocate(NumberOfChannels);
+ BxLog(trace) << "PMT-Relative Quantum Efficiency Map loaded for Inner Detector " << endlog;
+ BxLog(trace) << "Number of Hole Channels for Inner Detector= " << NumberOfChannels << endlog;
+
+  //--END OF PMT Relative Quantum Efficiency - for Inner Detector------------------------------
+
+
+
+  ////////////////////////////////////////////////////////////////////////////
+  //        Loading PMT Quantum Efficiency for Inner Detector               // 
+  ////////////////////////////////////////////////////////////////////////////
+
+
+  //       It gives the quantum efficiency of the photocathode of the
+  //       Thorn EMI 9351 photomultiplier depending on the wave length
+  //       of the scintillation photon.
+
+
+  fPhotonEnergyQE.allocate(1000);
+  i_dim = 0;
+  while (BxIO::Get()->GetStreamBxQEWave()>> thePMTQuantumEfficiencyWave) {
+    thePhotonEnergy = 1E+6*
+	    (h_Planck*c_light)/(thePMTQuantumEfficiencyWave);
+    thePhotonEnergy *= MeV;
+    BxLog(debugging) << "the PMTWave-thePhotonEnergy =  " << thePhotonEnergy << endlog;
+    fPhotonEnergyQE[i_dim] = thePhotonEnergy;
+    i_dim++;
+  }
+   fPhotonEnergyQE.reallocate(i_dim);
+
+  i_dim = 0;
+
+  fPMTQuantumEfficiency.allocate(1000);
+  while (BxIO::Get()->GetStreamBxQE()>> thePMTQuantumEfficiency) {
+      thePMTQuantumEfficiency /= 100.0;
+      thePMTQuantumEfficiency /= BxReadParameters::Get()->GetPMTQEMaximum();
+ 
+    //This feach'a is applied in Scintillator, but not in Bxon simulation
+    // *******************to have faster simulation this number is put into
+    // *******************PhotonYield=12000*0.312
+    //.N.B.: The Q.E. is divided by 0.312 so that the maximum
+    //        value it can reach is 1. The 0.312 factor is independent
+    //        of the wavelenght and can be taken into account toghether with the
+    //        practical Milano factor also in G4Cherenkov.cc
+    //
+    //
+    //thePMTQuantumEfficency /= 0.312;
+    //
+
+    //BxLog(debugging) << "thePMTQuantumEfficency   " << thePMTQuantumEfficency << endlog;
+    fPMTQuantumEfficiency[i_dim] = thePMTQuantumEfficiency; 
+    i_dim++;
+  }
+  fPMTQuantumEfficiency.reallocate(i_dim);
+  BxLog(trace) << "Loaded PMT" << endlog;
+
+  ////////////////////////////////////////////////////////////////////////////
+  //        Loading Surfaces Reflectivities and Efficiencies                // 
+  ////////////////////////////////////////////////////////////////////////////
+
+   //________Loading Other Surfaces Reflectivities and Efficiencies_____________
+   //___________________________________________________________________________
+
+
+  theNum = 2;
+
+  fPhotonEnergySSSRef.allocate(theNum);
+  fPhotonEnergySSSEff.allocate(theNum); 
+
+  fPhotonEnergySSSspecLOBE.allocate(theNum); 
+  fPhotonEnergySSSspecSPIKE.allocate(theNum);
+  fPhotonEnergySSSbackSCATT.allocate(theNum);
+
+
+  fPhotonEnergyPMTRef.allocate(theNum); 
+  fPhotonEnergyPMTEff.allocate(theNum); 
+  fPhotonEnergyPMTHousingRef.allocate(theNum);
+  fPhotonEnergyPMTHousingEff.allocate(theNum);
+  
+  fPhotonEnergyPMTringRef.allocate(theNum);
+  fPhotonEnergyPMTringEff.allocate(theNum);
+  fPhotonEnergyPMTringspecLOBE.allocate(theNum); 
+  fPhotonEnergyPMTringspecSPIKE.allocate(theNum);
+  fPhotonEnergyPMTringbackSCATT.allocate(theNum);
+  
+  fPhotonEnergyPMTShieldRef.allocate(theNum);
+  fPhotonEnergyPMTShieldEff.allocate(theNum);
+
+  fPhotonEnergyExternalLGRef.allocate(theNum); 
+  fPhotonEnergyExternalLGEff.allocate(theNum); 
+  fPhotonEnergyInternalLGRef.allocate(theNum); 
+  fPhotonEnergyInternalLGEff.allocate(theNum); 
+  fPhotonEnergyCopperStrutRef.allocate(theNum); 
+  fPhotonEnergyCopperStrutEff.allocate(theNum); 
+  fPhotonEnergyTubeSteelRef.allocate(theNum); 
+  fPhotonEnergyTubeSteelEff.allocate(theNum); 
+  fPhotonEnergyNylonReflectivity.allocate(theNum); 
+  fPhotonEnergyNylonEff.allocate(theNum); 
+  
+// To describe the reflectivity of  derlin Am-Be container
+  fPhotonEnergyDerlinRef.allocate(theNum);
+  fPhotonEnergyDerlinEff.allocate(theNum);
+
+  for(G4int i=0; i<theNum;i++)	{
+    thePhWaveLength = 100 + i*700;
+    thePhEnergy = 1E+6*
+		  (h_Planck*c_light)/(thePhWaveLength);
+    thePhEnergy *= MeV;
+
+    fPhotonEnergySSSRef[i]         = thePhEnergy;
+    fPhotonEnergySSSEff[i]         = thePhEnergy;
+    fPhotonEnergySSSspecLOBE [i]   = thePhEnergy;
+    fPhotonEnergySSSspecSPIKE[i]   = thePhEnergy;
+    fPhotonEnergySSSbackSCATT[i]   = thePhEnergy;
+    fPhotonEnergyPMTRef [i]        = thePhEnergy;
+    fPhotonEnergyPMTEff [i]        = thePhEnergy;
+    fPhotonEnergyPMTHousingRef [i] = thePhEnergy;
+    fPhotonEnergyPMTHousingEff [i] = thePhEnergy;
+    fPhotonEnergyPMTringRef [i] = thePhEnergy;
+    fPhotonEnergyPMTringEff [i] = thePhEnergy;
+    fPhotonEnergyPMTringspecLOBE [i]   = thePhEnergy;
+    fPhotonEnergyPMTringspecSPIKE[i]   = thePhEnergy;
+    fPhotonEnergyPMTringbackSCATT[i]   = thePhEnergy;
+    fPhotonEnergyPMTShieldRef [i]  = thePhEnergy;
+    fPhotonEnergyPMTShieldEff [i]  = thePhEnergy;
+    fPhotonEnergyExternalLGRef [i]      = thePhEnergy;
+    fPhotonEnergyExternalLGEff [i]      = thePhEnergy;
+    fPhotonEnergyInternalLGRef [i]      = thePhEnergy;
+    fPhotonEnergyInternalLGEff [i]      = thePhEnergy;
+    fPhotonEnergyCopperStrutRef[i]	= thePhEnergy; 
+    fPhotonEnergyCopperStrutEff[i]	= thePhEnergy; 
+    fPhotonEnergyTubeSteelRef[i]	= thePhEnergy; 
+    fPhotonEnergyTubeSteelEff[i]	= thePhEnergy; 
+    fPhotonEnergyNylonReflectivity[i]	= thePhEnergy; 
+    fPhotonEnergyNylonEff[i]	= thePhEnergy; 
+    fPhotonEnergyDerlinRef [i]      = thePhEnergy;
+    fPhotonEnergyDerlinEff [i]      = thePhEnergy;
+  }
+
+  fSSSReflectivity.allocate(theNum);
+  fSSSEfficiency.allocate(theNum);
+  fSSSspecLOBE.allocate(theNum);
+  fSSSspecSPIKE.allocate(theNum);
+  fSSSbackSCATT.allocate(theNum);
+  fPMTHousingReflectivity.allocate(theNum);
+  fPMTHousingEfficiency.allocate(theNum);
+  fPMTringReflectivity.allocate(theNum);
+  fPMTringEfficiency.allocate(theNum);
+  fPMTringspecLOBE.allocate(theNum);
+  fPMTringspecSPIKE.allocate(theNum);
+  fPMTringbackSCATT.allocate(theNum);
+  fPMTReflectivity.allocate(theNum);
+  fPMTEfficiency.allocate(theNum);
+  fPMTShieldReflectivity.allocate(theNum);
+  fPMTShieldEfficiency.allocate(theNum);
+  fExternalLGReflectivity.allocate(theNum);
+  fExternalLGEfficiency.allocate(theNum);
+  fExternalLGspecSPIKE.allocate(theNum);
+  fExternalLGspecLOBE.allocate(theNum);
+  fExternalLGbackSCATT.allocate(theNum);
+  fInternalLGReflectivity.allocate(theNum);
+  fInternalLGEfficiency.allocate(theNum);
+  fInternalLGspecSPIKE.allocate(theNum);
+  fInternalLGspecLOBE.allocate(theNum);
+  fInternalLGbackSCATT.allocate(theNum);
+  fCopperStrutReflectivity.allocate(theNum);
+  fCopperStrutEfficiency.allocate(theNum);
+  fTubeSteelReflectivity.allocate(theNum);
+  fTubeSteelEfficiency.allocate(theNum);
+  fNylonReflectivity.allocate(theNum);
+  fNylonEfficiency.allocate(theNum);
+ 
+  fDerlinReflectivity.allocate(theNum);  
+  fDerlinEfficiency.allocate(theNum); 
+ 
+  BxIO::Get()->GetStreamLogFile() << endl ;
+  BxIO::Get()->GetStreamLogFile() << "########## Detector Properties ###########" << endl ;
+
+  while (getline (BxIO::Get()->GetStreamBxProperty(), st ) ) {
+    
+    BxIO::Get()->GetStreamLogFile() << st << endl ;
+    
+    if (!st.find("SSSReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fSSSReflectivity[i] = value;
+    }
+
+    if (!st.find("SSSEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fSSSEfficiency[i] = value;
+    }
+
+    if (!st.find("SSSspecLOBE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fSSSspecLOBE[i] = value;
+    }
+
+    if (!st.find("SSSspecSPIKE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fSSSspecSPIKE[i] = value;
+    }
+
+    if (!st.find("SSSbackSCATT")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fSSSbackSCATT[i] = value;
+    }
+
+    if (!st.find("PMTHousingReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTHousingReflectivity[i] = value;
+    }
+
+    if (!st.find("PMTHousingEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTHousingEfficiency[i] = value;
+    }
+    
+    if (!st.find("PMTringReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTringReflectivity[i] = value;
+    }
+
+    if (!st.find("PMTringfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTringEfficiency[i] = value;
+    }
+
+    if (!st.find("PMTringspecLOBE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTringspecLOBE[i] = value;
+    }
+
+    if (!st.find("PMTringspecSPIKE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTringspecSPIKE[i] = value;
+    }
+
+    if (!st.find("PMTringbackSCATT")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTringbackSCATT[i] = value;
+    }
+
+    if (!st.find("PMTCathodeReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTReflectivity[i] = value;
+    }
+
+    if (!st.find("PMTCathodeEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTEfficiency[i] = value;
+    }
+
+    if (!st.find("PMTShieldReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTShieldReflectivity[i] = value;
+    }
+
+    if (!st.find("PMTShieldEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fPMTShieldEfficiency[i] = value;
+    }
+    if (!st.find("ConcentratorExternalReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fExternalLGReflectivity[i] = value;
+    }
+
+    if (!st.find("ConcentratorExternalEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fExternalLGEfficiency[i] = value;
+    }
+    if (!st.find("ConcentratorInternalReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fInternalLGReflectivity[i] = value;
+    }
+    if (!st.find("ConcentratorInternalEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fInternalLGEfficiency[i] = value;
+    }
+    if (!st.find("ConcentratorExternalspecSPIKE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fExternalLGspecSPIKE[i] = value;
+    }
+
+    if (!st.find("ConcentratorExternalspecLOBE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fExternalLGspecLOBE[i] = value;
+    }
+    if (!st.find("ConcentratorExternalbackSCATT")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fExternalLGbackSCATT[i] = value;
+    }
+    if (!st.find("ConcentratorInternalspecSPIKE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fInternalLGspecSPIKE[i] = value;
+    }
+
+    if (!st.find("ConcentratorInternalspecLOBE")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fInternalLGspecLOBE[i] = value;
+    }
+    if (!st.find("ConcentratorInternalbackSCATT")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fInternalLGbackSCATT[i] = value;
+    }
+    if (!st.find("CopperStrutReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fCopperStrutReflectivity[i] = value;
+    }
+    if (!st.find("CopperStrutEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fCopperStrutEfficiency[i] = value;
+    }
+    if (!st.find("TubeSteelReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fTubeSteelReflectivity[i] = value;
+    }
+    if (!st.find("TubeSteelEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fTubeSteelEfficiency[i] = value;
+    }
+    if (!st.find("NylonReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fNylonReflectivity[i] = value;
+    }
+    if (!st.find("NylonEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fNylonEfficiency[i] = value;
+    }
+    if (!st.find("DerlinReflectivity")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fDerlinReflectivity[i] = value;
+    }
+
+    if (!st.find("DerlinEfficiency")) {
+      G4double value = atof(st.substr(st.find("=")+1).c_str());
+      for(G4int i=0;i<theNum;i++)
+	  fDerlinEfficiency[i] = value;
+    }
+
+  
+  }
+return true;
+}
+
+
+void BxPropertyCollection::SetNylonReflectivity (G4double r){
+G4int theNum=fPhotonEnergyNylonRef.size();
+fNylonReflectivity.clear();
+fNylonReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fNylonReflectivity[i]=r;
+
+}
+
+void BxPropertyCollection::SetPMTringReflectivity (G4double r){
+G4int theNum=fPhotonEnergyPMTringRef.size();
+fPMTringReflectivity.clear();
+fPMTringReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fPMTringReflectivity[i]=r;
+
+}
+
+
+void BxPropertyCollection::SetPMTringspecSPIKE (G4double r){
+G4int theNum=fPhotonEnergyPMTringspecSPIKE.size();
+fPMTringspecSPIKE.clear();
+fPMTringspecSPIKE.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fPMTringspecSPIKE[i]=r;
+
+}
+
+void BxPropertyCollection::SetConcentratorExternalReflectivity (G4double r){
+G4int theNum=fPhotonEnergyExternalLGRef.size();
+fExternalLGReflectivity.clear();
+fExternalLGReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fExternalLGReflectivity[i]=r;
+
+}
+
+void BxPropertyCollection::SetConcentratorInternalReflectivity (G4double r){
+G4int theNum=fPhotonEnergyInternalLGRef.size();
+fInternalLGReflectivity.clear();
+fInternalLGReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fInternalLGReflectivity[i]=r;
+
+}
+
+void BxPropertyCollection::SetConcentratorExternalspecSPIKE (G4double r){
+G4int theNum=fPhotonEnergyExternalLGRef.size();
+fExternalLGspecSPIKE.clear();
+fExternalLGspecSPIKE.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fExternalLGspecSPIKE[i]=r;
+}
+
+void BxPropertyCollection::SetConcentratorInternalspecSPIKE (G4double r){
+G4int theNum=fPhotonEnergyInternalLGRef.size();
+fInternalLGspecSPIKE.clear();
+fInternalLGspecSPIKE.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fInternalLGspecSPIKE[i]=r;
+}
+
+
+void BxPropertyCollection::SetCathodeReflectivity (G4double r){
+G4int theNum=fPhotonEnergyPMTRef.size();
+fPMTReflectivity.clear();
+fPMTReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fPMTReflectivity[i]=r;
+
+}
+
+void BxPropertyCollection::SetShieldReflectivity (G4double r){
+G4int theNum=fPhotonEnergyPMTShieldRef.size();
+fPMTShieldReflectivity.clear();
+fPMTShieldReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fPMTShieldReflectivity[i]=r;
+}
+
+
+void BxPropertyCollection::SetSSSReflectivity (G4double r){
+G4int theNum=fPhotonEnergySSSRef.size();
+fSSSReflectivity.clear();
+fSSSReflectivity.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fSSSReflectivity[i]=r;
+
+}
+
+void BxPropertyCollection::SetSSSspecLOBE (G4double r){
+G4int theNum=fPhotonEnergySSSspecLOBE.size();
+fSSSspecLOBE.clear();
+fSSSspecLOBE.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fSSSspecLOBE[i]=r;
+}
+
+void BxPropertyCollection::SetSSSspecSPIKE (G4double r){
+G4int theNum=fPhotonEnergySSSspecSPIKE.size();
+fSSSspecSPIKE.clear();
+fSSSspecSPIKE.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fSSSspecSPIKE[i]=r;
+}
+
+void BxPropertyCollection::SetSSSbackSCATT (G4double r){
+G4int theNum=fPhotonEnergySSSbackSCATT.size();
+fSSSbackSCATT.clear();
+fSSSbackSCATT.allocate(theNum);
+
+for (G4int i=0; i<theNum; i++)
+	fSSSbackSCATT[i]=r;
+}
+
+
+  //_______Build Physics Table for Scintillation Integral__________
+
+void BxPropertyCollection::BuildPhysicsTable() {
+  if (fPhysicsTable) return;
+  const G4MaterialTable* theMaterialTable = G4Material::GetMaterialTable();
+  G4int numOfMaterials = theMaterialTable->size();
+  BxLog(debugging) << "Number of loaded materials =" << numOfMaterials  <<endlog;
+  BxLog(routine) << "Number of loaded materials =" << numOfMaterials  <<endlog;
+
+  // create new physics table
+
+  fPhysicsTable = new G4PhysicsTable(numOfMaterials);
+  // loop for materials
+
+  for (G4int i=0 ; i < numOfMaterials; i++)  {
+    G4PhysicsOrderedFreeVector* aPhysicsOrderedFreeVector = new G4PhysicsOrderedFreeVector();
+
+    // Retrieve vector of scintillation wavelength intensity
+    // for the material from the material's optical
+    // properties table
+    G4Material* aMaterial = (*theMaterialTable)[i];
+    G4MaterialPropertiesTable* aMaterialPropertiesTable = aMaterial->GetMaterialPropertiesTable();
+    if (aMaterialPropertiesTable) {
+      G4MaterialPropertyVector* theScintillationLightVector =   aMaterialPropertiesTable->GetProperty("EMISSION");
+      if (theScintillationLightVector) {
+        // Retrieve the first intensity point in vector
+        // of (photon momentum, intensity) pairs
+        //theScintillationLightVector->ResetIterator();	----------------------->Old implementation
+        //++(*theScintillationLightVector);	// advance to 1st entry
+        G4int theScintillationLightVectorIterator=0;
+	G4int theScintillationLightVectorLength=theScintillationLightVector->GetVectorLength();
+	G4bool IsOutOfRange;
+G4double currentPM= theScintillationLightVector->Energy(theScintillationLightVectorIterator);
+G4double currentIN = theScintillationLightVector->GetValue(currentPM,IsOutOfRange);	
+//G4double currentIN = theScintillationLightVector->GetProperty(); ---------->Old implementation
+	if (currentIN >= 0.0) {
+		// Create first (photon momentum, Scintillation
+		// Integral pair
+		//G4double currentPM = theScintillationLightVector->GetPhotonEnergy();
+		G4double currentCII = 0.0;
+		aPhysicsOrderedFreeVector->InsertValues(currentPM , currentCII);
+		// Set previous values to current ones prior to loop
+		G4double prevPM  = currentPM;
+		G4double prevCII = currentCII;
+		G4double prevIN  = currentIN;
+		// loop over all (photon momentum, intensity)
+		// pairs stored for this material
+		//while(++(*theScintillationLightVector))  {
+		//	currentPM = theScintillationLightVector->GetPhotonEnergy();--------------->Old implementation
+		//	currentIN=theScintillationLightVector->GetProperty();
+		while(theScintillationLightVectorIterator<theScintillationLightVectorLength-1)  {
+			theScintillationLightVectorIterator=theScintillationLightVectorIterator+1;
+			currentPM = theScintillationLightVector->Energy(theScintillationLightVectorIterator);
+			currentIN=theScintillationLightVector->GetValue(currentPM,IsOutOfRange);	
+			currentCII = 0.5 * (prevIN + currentIN);
+			currentCII = prevCII +(currentPM - prevPM) * currentCII;
+			aPhysicsOrderedFreeVector->InsertValues(currentPM, currentCII);
+			prevPM  = currentPM;
+			prevCII = currentCII;
+			prevIN  = currentIN;
+		}              
+	}   
+	}    
+      }  
+
+    // The scintillation integral for a given material
+    // will be inserted in thePhysicsTable
+    // according to the position of the material in
+    // the material table.
+    fPhysicsTable->insertAt(i,aPhysicsOrderedFreeVector);
+  }
+} 
+
+
+void BxPropertyCollection::ReadC14CorrectionFactor(){
+	G4int i=0;
+	G4double correction;
+	while (BxIO::Get()->GetStreamC14CorrectionFactor() >> correction) {
+		fC14ShapeFactorCorrection[i] = correction;
+		i++;
+	}
+}

@@ -39,6 +39,13 @@ class BxGeneratorSupernovaAntiNu : public BxVGenerator {
 	G4double GetAngleNeutron(G4double angle);
 
 	BxGeneratorSupernovaAntiNuMessenger*   fTheMessenger;
+	
+	G4ParticleTable*             fParticleTable;
+	G4ParticleDefinition*        fParticle;
+	G4ThreeVector                fPosition;
+	G4ThreeVector                fDirection;
+
+	G4bool                       isFirstTime;
 
 };
 #endif

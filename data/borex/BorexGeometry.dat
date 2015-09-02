@@ -1,0 +1,50 @@
+//
+//  Borexino Geometry
+// NB: the program reads line by line. If you need to add comments, add them in different lines than the ones that contain the numbers.
+//___________________________________________________________
+
+SSSInnerRadius = 6850.0
+SSSThickness = 8.0 
+//this is the minimum value. It is different in the various slices of the sphere.
+SSSOriginZ = 7858.0
+ShroudInnerRadius = 5500.0 
+//it was 5250.0 before!! checked on paper "the borexino detector at LNGS"
+ShroudThickness = 0.125
+ShroudOriginZ = 0.0
+IVInnerRadius = 4250.0 
+IVThickness   =   0.125
+//it was 0.15 before!! checked on paper "the borexino detector at LNGS"
+IVOriginZ = 0
+PMTExternalRadius = 110.0
+PMTCathodeThickness = 0.1
+PMTInsideThickness = 0.1
+PMTMiddleLength = 18.0
+PMTBackDiameter = 84.5
+PMTBackLength = 80.0
+PMTFrameThickness = 2.5
+PMTExternalProjection = 203.0
+PMTPhotocathodeProjection = 190.0
+
+PMTLength= 251.2
+
+PMTShieldExternalDiameter1 = 200.0
+PMTShieldExternalDiameter2 = 280.0
+PMTShieldLength = 200.0
+PMTShieldThickness = 0.5
+PMTShieldZPosition = 118.8
+
+PMTLightGuideZShift = 12.6
+
+PMTCANShift= 13.0
+PMTCANExternalDiameter = 90.0
+PMTCANThickness = 1.5
+PMTCANLength = 160.0
+
+PMTringRinner1= 95.26
+PMTringRinner2= 106.06
+PMTringRinner3= 130.14
+PMTringZ1= 11.03
+PMTringZ2= 55.15
+PMTringShift= 12.6
+PMTringThickness= 0.5
+

@@ -1,0 +1,105 @@
+SSSReflectivity = 0.55
+SSSEfficiency = 0.0
+SSSspecLOBE = 0.00
+SSSspecSPIKE = 0.12
+SSSbackSCATT = 0.0
+
+PMTQEMaximum = 0.312
+PMTRelativeQEflag = 1
+PMTHousingReflectivity = 0.4
+PMTHousingEfficiency = 0.0
+PMTCathodeReflectivity = 0.0
+PMTCathodeEfficiency = 1.0
+PMTShieldReflectivity= 0.4
+PMTShieldEfficiency = 0.0
+
+//PMT rings for PMTs without concentrator
+PMTringEfficiency = 0.0
+PMTringReflectivity = 0.75
+PMTringspecLOBE = 0.0
+PMTringspecSPIKE = 0.88
+PMTringbackSCATT = 0.0
+
+//concentrators
+ConcentratorExternalReflectivity = 0.95
+ConcentratorInternalReflectivity = 0.95
+ConcentratorExternalEfficiency = 0.0
+ConcentratorInternalEfficiency = 0.0
+ConcentratorExternalspecSPIKE = 0.975
+ConcentratorExternalspecLOBE = 0.0
+ConcentratorExternalbackSCATT = 0.0
+ConcentratorInternalspecSPIKE = 0.985
+ConcentratorInternalspecLOBE = 0.0
+ConcentratorInternalbackSCATT = 0.0
+
+//Vessels' EndCaps
+CopperStrutReflectivity = 0.4
+CopperStrutEfficiency = 0.0
+TubeSteelReflectivity = 0.4
+TubeSteelEfficiency = 0.0
+NylonReflectivity = 0.3
+NylonEfficiency = 0.0
+
+//Derlin Reflectivity
+DerlinReflectivity = 0.7
+DerlinEfficiency = 0.0
+
+// materials
+RindexWater = 1.33
+RindexAir = 1.0
+RindexNylon = 1.53
+RindexGlass = 1.495
+//still not used
+RindexPhotocathod = 1.495
+//still not used
+
+ReemissionProbabilityPC = 0.4
+//used only in buffer events
+
+ReemissionProbabilityPPOLowWl = 0.839
+ReemissionProbabilityPPOHighWl = 0.15
+ReemissionProbabilityPPOThrWl = 375.
+PPOAbsReemProbXRays = 0.53
+PPOAbsReemProbThXRays = 320. 
+WaterAbsorptionLength = 50000
+AirAbsorptionLength = 100000
+GlassAbsorptionLength = 60
+//still not used
+
+PPOAttenuationLengthFactor = 1.15
+PCAttenuationLengthFactor = 1.35
+DMPAttenuationLengthFactor = 1.1
+NylonAttenuationLengthFactor = 0.75
+
+// physics
+BetaPhotonYield =  13600
+LightYieldScale = 1.0 
+BirksBeta = 0.01098
+BirksAlpha = 0.01042
+BirksProton = 0.01042
+SecondOrderBirksBeta  = 0.
+SecondOrderBirksAlpha = 0.
+SecondOrderBirksProton = 0.
+
+// Scintillator decay constants	
+AlphaDecayTimeConstant1 =  3.9 
+AlphaDecayTimeConstant2 =  26 
+AlphaDecayTimeConstant3 =  110 
+AlphaDecayTimeConstant4 =  630
+AlphaDecayWeight1 =  0.674 	
+AlphaDecayWeight2 =  0.146 	
+AlphaDecayWeight3 =  0.103 	
+AlphaDecayWeight4 =  0.077 	
+
+BetaDecayTimeConstant1 =  3.7 
+BetaDecayTimeConstant2 =  24
+BetaDecayTimeConstant3 =  60
+BetaDecayTimeConstant4 =  600
+BetaDecayWeight1 =  0.889 	
+BetaDecayWeight2 =  0.055 	
+BetaDecayWeight3 =  0.027 	
+BetaDecayWeight4 =  0.029 	
+
+TimePPOEmission=1.6
+TimePCEmission= 28.0
+TimePCtoPPOTransfer=3.6

@@ -1,0 +1,140 @@
+##########################################################
+#                                                        #
+#                   Multi Event Macro                    #
+#                                                        #
+##########################################################
+
+# PDG particle codes
+#
+# e-    = 11  
+# e+    = -11 
+# gamma = 22 
+# p     = 2212  
+# n     = 2112
+# alpha = 1000020040
+# mu-   = 13
+
+
+#PreInit:
+
+#  Define the level of verbosity of messages
+# options: development debugging, trace, routine, warning, error
+# default: routine
+/bxlog trace
+
+# Set the event report frequency
+# default: 1000
+/event/eventreport  100
+
+# Define output file name
+/run/filename outtest
+
+#Run number being simulated
+/bx/detector/run_number 12106
+
+#Detector configuration. Possible choices are: full, fullWater, inWater, inScint, outer, ctf
+#Default: full
+/bx/detector/configuration full
+
+#PMTs distribution. Possible choices are: real, uniform.
+#Default: real
+/bx/detector/PMTdistribution real
+#Number of PMTs defined only for uniform distribution
+#/bx/detector/PMTnumber 2000
+
+#PMT configuration. Possible choices are: diskPMT, diskPMTwithConcentrator, simplePMT
+#default: simplePMT
+/bx/detector/PMTconfiguration simplePMT
+
+#Setting of NoConcentrators (true=concentrators disabled for any PMT configuration):
+/bx/detector/noConcentrators false
+
+#Vessel's configuration
+/bx/detector/deformed_vessel true
+/bx/detector/vessel_step 1 cm
+
+#Geometry debugging
+/bx/detector/check_overlaps false
+
+
+
+
+# Define  random seed
+/run/heprandomseed 12345679
+
+#/event/npethreshold -1
+#/bx/detector/nopmts true
+#/bx/physics/lightyield 0
+
+/bx/physics/ecut       0.01 mm
+/bx/physics/gammacut   0.1 mm
+
+#/bx/detector/birksBeta 0.014
+
+/bx/detector/source/origin 0. 0. 0. cm
+/bx/detector/source/type sphere
+/bx/detector/source/radius 1.1 cm
+/bx/detector/source/thickness 1.5 mm
+/bx/detector/source/material water
+/bx/detector/source/vialmaterial quartz
+#-----------------------------------
+/run/initialize
+#-----------------------------------
+
+#PostInit:
+
+/bx/generator/select Multi
+
+
+#/bx/generator/multi/event     ID BRTOT  PDG  ENE    BR 
+
+#Co57
+/bx/generator/multi/event      1  0.89   22   0.122    1.
+/bx/generator/multi/event      1  0.89   22   0.014    1.
+/bx/generator/multi/event      2  0.11   22   0.136    1.
+
+#Ce139
+/bx/generator/multi/event      3  1   22   0.166    1.
+/bx/generator/multi/event      3  1   22   0.034    0.11
+
+#Hg203
+/bx/generator/multi/event      4  1   22   0.279    1.
+/bx/generator/multi/event      4  1   22   0.072    0.13
+
+#Sr85
+/bx/generator/multi/event      5  1   22   0.514    1.
+/bx/generator/multi/event      5  1   22   0.015    0.61
+
+#Mn54
+/bx/generator/multi/event      6  1   22   0.835    1.
+/bx/generator/multi/event      6  1   22   0.005    0.25
+
+#Zn65
+/bx/generator/multi/event      6  1   22   1.116    1.
+
+#Co60
+/bx/generator/multi/event      7  1   22   1.173    1.
+/bx/generator/multi/event      7  1   22   1.332    1.
+
+#K40
+/bx/generator/multi/event      8  1   22   1.461    1.
+
+# Neutron (H)
+/bx/generator/multi/event      9  1   22   2.223    1.
+
+# Neutron (C12)
+/bx/generator/multi/event      10  1   22   4.949    1.
+
+# Neutron (Fe56)
+/bx/generator/multi/event      11  1   22   7.638    1.
+
+# Neutron (Ni58)
+/bx/generator/multi/event      12  1   22   8.999    1.
+
+
+
+/bx/generator/multi/sphere_radius 1.1 cm
+
+
+# Define the number of events
+/run/beamOn 10

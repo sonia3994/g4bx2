@@ -1,0 +1,74 @@
+##########################################################
+#                                                        #
+#                  Neutrino on C13 Generator Example     #
+#                                                        #
+##########################################################
+#/bx/physics/hadronic_physics 1
+/bx/physics/decay 1
+
+#PreInit:
+
+#  Define the level of verbosity of messages
+# options: development debugging, trace, routine, warning, error
+# default: routine
+/bxlog routine
+
+
+# Set the event report frequency
+# default: 1000
+/event/eventreport  1
+#/event/verbosity  1
+
+/event/npethreshold 0
+
+# Define output file name
+
+/run/filename C13
+
+# Define  random seed
+/run/heprandomseed 12345679
+
+#Run number being simulated
+/bx/detector/run_number 12106
+
+#Detector configuration. Possible choices are: full, fullWater, inWater, inScint, outer, ctf
+#Default: full
+/bx/detector/configuration full
+
+#PMTs distribution. Possible choices are: real, uniform.
+#Default: real
+/bx/detector/PMTdistribution real
+#Number of PMTs defined only for uniform distribution
+#/bx/detector/PMTnumber 2000
+
+#PMT configuration. Possible choices are: diskPMT, diskPMTwithConcentrator, simplePMT
+#default: simplePMT
+/bx/detector/PMTconfiguration simplePMT
+
+#Setting of NoConcentrators (true=concentrators disabled for any PMT configuration):
+/bx/detector/noConcentrators false
+
+#Vessel's configuration
+/bx/detector/deformed_vessel true
+/bx/detector/vessel_step 1 cm
+
+#Geometry debugging
+/bx/detector/check_overlaps false
+
+
+
+#-----------------------------------
+/run/initialize
+#-----------------------------------
+
+/bx/stack/select Neutron
+/bx/generator/select NeutrinoC13
+/bx/generator/NeutrinoC13/source Full
+
+# Full First Second Flat - you can choose 4 possibilities
+
+
+/bx/generator/NeutrinoC13/sphere_radius 4.25 m
+
+
+/run/beamOn 10

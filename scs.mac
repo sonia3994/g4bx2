@@ -1,0 +1,75 @@
+########################################################## 
+#                                                        # 
+#                      Source Macro                      # 
+#                                                        # 
+#                         By Alessio Caminata            # 
+#               (alessio.caminata@ge.infn.it)            # 
+#                                                        # 
+########################################################## 
+#                                                        
+
+
+#PreInit:  
+
+#  Define the level of verbosity of messages
+# options: development debugging, trace, routine, warning, error
+# default: routine
+/bxlog routine
+
+# Define output file name 
+#/run/filename gunoutput
+
+# Define  random seed
+#/run/heprandomseed 12345679
+
+#Run number being simulated
+/bx/detector/run_number 12106
+
+#Detector configuration. Possible choices are: full, fullWater, inWater, inScint, outer, ctf
+#Default: full
+/bx/detector/configuration full
+
+#PMTs distribution. Possible choices are: real, uniform.
+#Default: real
+/bx/detector/PMTdistribution real
+#Number of PMTs defined only for uniform distribution
+#/bx/detector/PMTnumber 2000
+
+#PMT configuration. Possible choices are: diskPMT, diskPMTwithConcentrator, simplePMT
+#default: simplePMT
+/bx/detector/PMTconfiguration simplePMT
+
+#Setting of NoConcentrators (true=concentrators disabled for any PMT configuration):
+/bx/detector/noConcentrators false
+
+#Vessel's configuration
+/bx/detector/deformed_vessel true
+/bx/detector/vessel_step 1 cm
+
+#Geometry debugging
+/bx/detector/check_overlaps false
+
+
+/run/initialize
+#-----------------------------------
+
+#PostInit:
+
+# Define the RDM generator
+/bx/generator/select SCS 
+
+#possible choices c14 c14oleg bi210
+/bx/generator/scs/isotope c14 
+/bx/generator/scs/c14reference 7
+
+# Define the spatial distribution
+/bx/generator/scs/position 0 0 0 mm
+#/bx/generator/scs/surface_radius 425. cm
+/bx/generator/scs/sphere_radius 10. cm
+#/bx/generator/scs/sphere_radius_min 425. cm
+#/bx/generator/scs/direction 0.0 0.0 1.0
+#/bx/generator/scs/position  0.0 0.0 1.0 m
+
+# Define the event number
+/run/verbose 2
+/run/beamOn 20 

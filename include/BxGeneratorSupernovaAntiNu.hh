@@ -38,6 +38,9 @@ class BxGeneratorSupernovaAntiNu : public BxVGenerator {
 	G4double GetKinEnergyNeutron(G4double angle, G4double energyPositron);
 	G4double GetAngleNeutron(G4double angle);
 
+        G4ThreeVector  GetVParticlePosition(); //замутить ивент рандомно в определенном объеме
+
+
 	BxGeneratorSupernovaAntiNuMessenger*   fTheMessenger;
 	
 	G4ParticleTable*             fParticleTable;
@@ -46,6 +49,7 @@ class BxGeneratorSupernovaAntiNu : public BxVGenerator {
 	G4ThreeVector                fDirection;
 
 	G4bool                       isFirstTime;
+        G4SPSPosDistribution*        fSPSPos;  //для GetVParticlePosition()
 
 };
 #endif

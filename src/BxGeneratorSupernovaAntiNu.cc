@@ -25,21 +25,13 @@ BxGeneratorSupernovaAntiNu::BxGeneratorSupernovaAntiNu(): BxVGenerator("BxGenera
 
 
   isFirstTime = true ; 
-  //fNeutrinoType = -1;
-  
 
-
-  /*fVolumeFlag = false ;
-  G4ThreeVector zero(0., 0., 0.) ;
-  fSPSAng = new G4SPSAngDistribution ;
+  fPosition = G4ThreeVector(0.,0.,0.) ;
+  fDirection = G4ThreeVector(1.,0.,0.);
+  fParticleTable = G4ParticleTable::GetParticleTable();
   fSPSPos = new G4SPSPosDistribution ;
   G4SPSRandomGenerator *RndGen = new G4SPSRandomGenerator;
   fSPSPos->SetBiasRndm(RndGen);
-  fSPSAng->SetBiasRndm(RndGen);
-  SetRadius0(0.);
-  SetCentreCoords(zero);    
-  fPosition = G4ThreeVector(0.,0.,0.) ;
-  fParticleTable = G4ParticleTable::GetParticleTable(); */   
 
   fTheMessenger = new BxGeneratorSupernovaAntiNuMessenger(this);
  
@@ -74,7 +66,7 @@ void BxGeneratorAntiNeutrino::BxGeneratePrimaries(G4Event *event) {
 	if ((event->GetEventID())%2 == 0) {
 
 		fParticle = fParticleTable->FindParticle(-11); // -11 for the positron
-		G4double anglePos = ShootAnglePositron();;
+                G4double anglePos = ShootAnglePositron();
 	}
 
 }

@@ -14,6 +14,8 @@
 #include "G4SPSAngDistribution.hh"
 #include "G4SPSEneDistribution.hh"
 
+#include <math.h>
+
 
 
 //---------------------------------------------------------------------------//
@@ -35,6 +37,7 @@ class BxGeneratorSupernovaAntiNu : public BxVGenerator {
   	virtual void BxGeneratePrimaries(G4Event *event);
 
  private:
+        //вспомогательные константы и переменные
         G4double const pi  = 3.14159265358979323846;
         G4double const f  = 1.0;
         G4double const g  = 1.26;
@@ -50,8 +53,25 @@ class BxGeneratorSupernovaAntiNu : public BxVGenerator {
         G4double const y         = (delt*delt-me*me)/2.;
         G4double const sigma0    = ((Gfermi*Gfermi)*cosUCab*cosUCab)*(1+deltInRad)/pi;
 
+        G4double eNu;
+        G4double e0;
+        G4double ve0;
+        vecotor<G4double> pos_probability;
+        vector<G4double> pos_energyBin;
+
+        // вспомогательные функции
         void     initFunc(G4double eNu);
-	G4double ShootAnglePositron();
+        G4double getPosEnergy(G4double cosTeta) {
+            return e0*(1-(eNu/M)*(1-ve0*cosTeta)) - y*y/M;
+        }
+        G4double getBigGamma(G4double cosTeta) {
+            return 2*(f+f2)*g*((2*e0 + delt)*(1-ve0*cosTeta) - (me**2)/self.e0) +
+                    (f**2 + g**2)*(delt*(1+ve0*cosTeta) + (me**2)/e0) +
+                    (f**2 + 3*g*g)*((e0 + delt)*(1 - (1/ve0)*cosTeta) - delt) +
+                    (f**2 - g**2)*((e0 + delt)*(1 - (1/ve0)*cosTeta) - delt)*ve0*cosTeta;
+        }
+
+        G4double ShootAnglePositron();
 	G4double GetKinEnergyPositron(G4double angle);
 	G4double GetKinEnergyNeutron(G4double angle, G4double energyPositron);
 	G4double GetAngleNeutron(G4double angle);

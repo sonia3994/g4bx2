@@ -14,7 +14,9 @@
 #include "G4SPSAngDistribution.hh"
 #include "G4SPSEneDistribution.hh"
 
-#include <math.h>
+#include <math>
+#include <vector>
+
 
 
 
@@ -56,25 +58,38 @@ class BxGeneratorSupernovaAntiNu : public BxVGenerator {
         G4double eNu;
         G4double e0;
         G4double ve0;
-        vecotor<G4double> pos_probability;
-        vector<G4double> pos_energyBin;
+        //std::vector<G4double> cosTeta;
+        std::vector<G4double> dS_dc;
+        std::vector<G4double> pos_probability;
+        std::vector<G4double> pos_energyBin; //pos_energyBin <=> cosTeta
 
         // вспомогательные функции
-        void     initFunc(G4double eNu);
+        void     initFunc(G4double);
         G4double getPosEnergy(G4double cosTeta) {
             return e0*(1-(eNu/M)*(1-ve0*cosTeta)) - y*y/M;
         }
+        G4double dSigma_dcos(G, posE, cosTeta) {
+            return (sigma0/2.)*((f*f+3*g*g)+(f*f-g*g)*(pow((posE*posE - me*me), 1./2.) /
+                             (posE))*cosTeta)*posE*pow((posE*posE - me*me), 1./2.) -
+                    (sigma0/2.)*(G/M)*e0*pow((e0*e0-me*me),1./2.);
+        }
+
         G4double getBigGamma(G4double cosTeta) {
-            return 2*(f+f2)*g*((2*e0 + delt)*(1-ve0*cosTeta) - (me**2)/self.e0) +
+            return 2*(f+f2)*g*((2*e0 + delt)*(1-ve0*cosTeta) - (me**2)/e0) +
                     (f**2 + g**2)*(delt*(1+ve0*cosTeta) + (me**2)/e0) +
                     (f**2 + 3*g*g)*((e0 + delt)*(1 - (1/ve0)*cosTeta) - delt) +
                     (f**2 - g**2)*((e0 + delt)*(1 - (1/ve0)*cosTeta) - delt)*ve0*cosTeta;
         }
+        G4double getKinNeutron(G4double cosTeta) {
+            return (eNu*e0/M)*(1-ve0*cosTeta) + y**2/M;
+        }
+        G4double getAngleNeutron(G4double cosTeta, enPos, kinNeutr) {
+            return (mp*mp + me*me - 2*mp*enPos - mn**2 +2*eNu*(kinNeutr+mn))/
+                    (2*pow(((kinNeutr+mn)*(kinNeutr+mn)-mn*mn),(1./2.))*eNu);
+        }
 
         G4double ShootAnglePositron();
-	G4double GetKinEnergyPositron(G4double angle);
-	G4double GetKinEnergyNeutron(G4double angle, G4double energyPositron);
-	G4double GetAngleNeutron(G4double angle);
+
 
         G4ThreeVector  GetVParticlePosition(); //замутить ивент рандомно в определенном объеме
 

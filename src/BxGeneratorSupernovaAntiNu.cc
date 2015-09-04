@@ -49,7 +49,7 @@ BxGeneratorSupernovaAntiNu::~BxGeneratorSupernovaAntiNu()
 
 //---------------------------------------------------------------------------//
 
-void BxGeneratorAntiNeutrino::BxGeneratePrimaries(G4Event *event) {
+void BxGeneratorSupernovaAntiNu::BxGeneratePrimaries(G4Event *event) {
 
 
 	if(isFirstTime) {
@@ -70,3 +70,45 @@ void BxGeneratorAntiNeutrino::BxGeneratePrimaries(G4Event *event) {
 	}
 
 }
+
+void BxGeneratorSupernovaAntiNu::initFunc(G4double eN) {
+    //вспомогрательные переменные
+    G4double summ=0.;
+    G4double norma=0.;
+    G4double init=-1.;
+    G4double step=0.01;
+
+    eNu = eN;
+    e0  = eNu - delt;
+    ve0 = pow((e0*e0-me*me),1./2.)/e0;
+    for (int i=0; i < 201; i++) {
+        pos_energyBin.push_back(init + step*i); //pos_energyBin <=> cosTeta
+        G4double posE = getPosEnergy(pos_energyBin[i]);
+        G4double gamma = getBigGamma(pos_energyBin[i]);
+        dS_dc.push_back(dSigma_dcos(gamma,posE,pos_energyBin[i]));
+        if (i !=0) //dS_dc[0] = 0.
+            norma +=dS_dc[i];
+    }
+    dS_dc[0] = 0.; //для правильнной интерполяции
+    for (int i=0; i < dS_dc.size(); i++) {
+        summ += dS_dc[i]/norma;
+        pos_probability.push_back(summ);
+    }
+}
+
+G4double BxGeneratorSupernovaAntiNu::ShootAnglePositron() {
+    G4double val = G4UniformRand();   //узнать, можно ли так делать
+    G4double deltaX,x,y;
+    for (int i=0; i < dS_dc.size(); i++) {
+        if(pos_probability[i] >= val) {
+            deltaX = val - pos_probability[i];
+            y =pos_energyBin[i]-pos_energyBin[i-1];
+            x= pos_probability[i]-pos.probability[i-1];
+            return deltaX*y/x + pos_energyBin[i];
+        }
+    }
+    return -2.; //подумай
+
+}
+
+

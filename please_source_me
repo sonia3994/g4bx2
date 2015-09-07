@@ -53,5 +53,5 @@ unset  G4VIS_BUILD_RAYTRACERX_DRIVER
 export LD_LIBRARY_PATH=""
 export G4BX=$PWD
 export PostgreSQL_DIR=$PWD
-source /opt/ROOT/ROOT_5.34.03/bin/thisroot.sh
-source /home/pugachev/program/geant4.10-install/bin/geant4.sh
+source /home/pugach/development/ROOT_6.04.00/bin/thisroot.sh
+source /usr/local/bin/geant4.sh

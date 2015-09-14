@@ -26,8 +26,9 @@
 
 BxGeneratorSupernovaAntiNu::BxGeneratorSupernovaAntiNu(): BxVGenerator("BxGeneratorSupernovaAntiNu") {
 
+  initFunc(5);
 
-  isFirstTime = true ; 
+  isFirstTime = true ;
   fScintFlag  = false;
   fNeutrinoType = -1;
   gNavigator = G4TransportationManager::GetTransportationManager()->GetNavigatorForTracking();
@@ -76,18 +77,21 @@ void BxGeneratorSupernovaAntiNu::BxGeneratePrimaries(G4Event *event) {
 	}
         if(fScintFlag)
             fPosition = GetVParticlePositionInScint();
+        G4cout << G4endl << G4endl << "Tuta ia!!!!" << G4endl << G4endl;
 
 
 	if ((event->GetEventID())%2 == 0) {
+            G4cout << G4endl << G4endl << "Suda ia!!!!" << G4endl << G4endl;
 
             G4double cosThetaPos = ShootAnglePositron();
-            G4double enPos      = getPosEnergy(cosThetaPos);
+            G4double enPos      = getPosEnergy(cosThetaPos)*MeV;
+            G4cout << G4endl << G4endl << "enPos = " << enPos << G4endl << G4endl;
             G4double phiPos     = G4UniformRand()*360*degree;
-            G4double phiNeutr   = 0.0*degree;
-            if (phiPos >= 180.*degree)
-                phiNeutr = phiPos - 180.*degree;
+            G4double phiNeutr   = 0.0*deg;
+            if (phiPos >= 180.*deg)
+                phiNeutr = phiPos - 180.*deg;
             else
-                phiNeutr = phiPos + 180.*degree;
+                phiNeutr = phiPos + 180.*deg;
 
 
             if(GetNeutrinoType() == both || GetNeutrinoType() == positron) {  //разыгрываем позитрон
@@ -97,7 +101,7 @@ void BxGeneratorSupernovaAntiNu::BxGeneratePrimaries(G4Event *event) {
                 fDirection.setY(sin(phiPos)*cosThetaPos);
                 fDirection.setZ(-1.0*sqrt(1.-cosThetaPos*cosThetaPos));
 
-                G4double pmom = sqrt(enPos*enPos - me*me);
+                G4double pmom = sqrt(enPos*enPos - (fParticle->GetPDGMass())*(fParticle->GetPDGMass()));    //Здесь могут быть проблемы с размерностями
                 G4double px = pmom*fDirection.x();
                 G4double py = pmom*fDirection.y();
                 G4double pz = pmom*fDirection.z();
@@ -106,12 +110,22 @@ void BxGeneratorSupernovaAntiNu::BxGeneratePrimaries(G4Event *event) {
                 G4PrimaryParticle* particle = new G4PrimaryParticle(fParticle,px,py,pz);
                 vertex->SetPrimary( particle );
                 event->AddPrimaryVertex( vertex );
+
+                 BxOutputVertex::Get()->SetIsotopeCoinc(0);
+                BxOutputVertex::Get()->SetEnergy(enPos - (fParticle->GetPDGMass()));
+                BxOutputVertex::Get()->SetPosition(fPosition);
+                BxOutputVertex::Get()->SetDirection(fDirection);
+                BxOutputVertex::Get()->SetTime(0);
+                BxOutputVertex::Get()->SetPDG(fParticle->GetPDGEncoding());
             }
 
             if(GetNeutrinoType() == both || GetNeutrinoType() == neutron) {  //разыгрываем нейтрон
 
-                G4double kinNeutr = getKinNeutron(cosThetaPos);
+                G4double kinNeutr = getKinNeutron(cosThetaPos)*MeV;
                 G4double cosThetaNeutr = getAngleNeutron(enPos, kinNeutr);
+                 G4cout << G4endl << G4endl << "cosThetaNeutr = " << cosThetaNeutr << G4endl << G4endl;
+                 //cosThetaNeutr = 0.8;
+
 
                 fParticle = fParticleTable->FindParticle(2112); // -11 for the positron
                 fDirection.setX(cos(phiNeutr)*cosThetaNeutr);
@@ -129,6 +143,13 @@ void BxGeneratorSupernovaAntiNu::BxGeneratePrimaries(G4Event *event) {
                 G4PrimaryParticle* particle = new G4PrimaryParticle(fParticle,px,py,pz);
                 vertex->SetPrimary( particle );
                 event->AddPrimaryVertex( vertex );
+
+                BxOutputVertex::Get()->SetDId(0);
+                BxOutputVertex::Get()->SetDPosition(fPosition);
+                BxOutputVertex::Get()->SetDPDG(2112);
+                BxOutputVertex::Get()->SetDTime(0.);
+                BxOutputVertex::Get()->SetDEnergy(kinNeutr);
+                BxOutputVertex::Get()->SetDaughters();
             }
 
 

@@ -32,4 +32,9 @@ class BxGeneratorSupernovaAntiNuMessenger: public G4UImessenger {
     	BxGeneratorSupernovaAntiNu*              generator;   
     	G4UIdirectory*                           fDirectory;
 
+        G4UIcmdWith3VectorAndUnit*           fPositionCmd;
+        G4UIcmdWithAString*                  fNeutrinoCmd ;
+        G4UIcmdWithAnInteger*                fGenInScintCmd;
+
 };
+#endif

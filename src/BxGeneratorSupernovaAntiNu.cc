@@ -12,6 +12,9 @@
 #include "BxGeneratorSupernovaAntiNu.hh"
 #include "G4SystemOfUnits.hh"
 #include "BxGeneratorSupernovaAntiNuMessenger.hh"
+
+#include "G4Material.hh"
+#include "G4TransportationManager.hh"
 //---------------------------------------------------------------------------//
 /**Please use the stacking action command in macro
  * file /bx/stack/select to postpone the neutron capture
@@ -25,13 +28,22 @@ BxGeneratorSupernovaAntiNu::BxGeneratorSupernovaAntiNu(): BxVGenerator("BxGenera
 
 
   isFirstTime = true ; 
+  fScintFlag  = false;
+  fNeutrinoType = -1;
+  gNavigator = G4TransportationManager::GetTransportationManager()->GetNavigatorForTracking();
 
   fPosition = G4ThreeVector(0.,0.,0.) ;
   fDirection = G4ThreeVector(1.,0.,0.);
   fParticleTable = G4ParticleTable::GetParticleTable();
   fSPSPos = new G4SPSPosDistribution ;
   G4SPSRandomGenerator *RndGen = new G4SPSRandomGenerator;
-  fSPSPos->SetBiasRndm(RndGen);
+  fSPSPos->SetBiasRndm(RndGen); //для разыгрования по объему
+  fSPSPos->SetPosDisType("Volume");
+  fSPSPos->SetPosDisShape("Sphere");
+  fSPSPos->SetCentreCoords(G4ThreeVector(0.,0.,0.));
+  fSPSPos->SetRadius(4255.*mm);
+
+
 
   fTheMessenger = new BxGeneratorSupernovaAntiNuMessenger(this);
  
@@ -42,7 +54,7 @@ BxGeneratorSupernovaAntiNu::BxGeneratorSupernovaAntiNu(): BxVGenerator("BxGenera
 BxGeneratorSupernovaAntiNu::~BxGeneratorSupernovaAntiNu()
 {
   delete fTheMessenger;
-  //delete fSPSPos;
+  delete fSPSPos;
   //delete fSPSAng;
   
 }
@@ -53,22 +65,105 @@ void BxGeneratorSupernovaAntiNu::BxGeneratePrimaries(G4Event *event) {
 
 
 	if(isFirstTime) {
-		if(fNeutrinoType < 0) {
+                if(fNeutrinoType < 0) {
       	    BxLog(error) << "Set the antineutrino source type"<<endlog;
       	    BxLog(fatal) << endlog;
-    	}
+        }
 
-    	  BxLog(routine) << "AntiNeutrino source " << fNeutrinoType << endlog ;
+          BxLog(routine) << "AntiNeutrino source " << fNeutrinoType << endlog ;
 
     	  isFirstTime = false ;
 	}
+        if(fScintFlag)
+            fPosition = GetVParticlePositionInScint();
+
 
 	if ((event->GetEventID())%2 == 0) {
 
-		fParticle = fParticleTable->FindParticle(-11); // -11 for the positron
-                G4double anglePos = ShootAnglePositron();
+            G4double cosThetaPos = ShootAnglePositron();
+            G4double enPos      = getPosEnergy(cosThetaPos);
+            G4double phiPos     = G4UniformRand()*360*degree;
+            G4double phiNeutr   = 0.0*degree;
+            if (phiPos >= 180.*degree)
+                phiNeutr = phiPos - 180.*degree;
+            else
+                phiNeutr = phiPos + 180.*degree;
+
+
+            if(GetNeutrinoType() == both || GetNeutrinoType() == positron) {  //разыгрываем позитрон
+
+                fParticle = fParticleTable->FindParticle(-11); // -11 for the positron
+                fDirection.setX(cos(phiPos)*cosThetaPos);
+                fDirection.setY(sin(phiPos)*cosThetaPos);
+                fDirection.setZ(-1.0*sqrt(1.-cosThetaPos*cosThetaPos));
+
+                G4double pmom = sqrt(enPos*enPos - me*me);
+                G4double px = pmom*fDirection.x();
+                G4double py = pmom*fDirection.y();
+                G4double pz = pmom*fDirection.z();
+
+                G4PrimaryVertex*   vertex   = new G4PrimaryVertex(fPosition,0);
+                G4PrimaryParticle* particle = new G4PrimaryParticle(fParticle,px,py,pz);
+                vertex->SetPrimary( particle );
+                event->AddPrimaryVertex( vertex );
+            }
+
+            if(GetNeutrinoType() == both || GetNeutrinoType() == neutron) {  //разыгрываем нейтрон
+
+                G4double kinNeutr = getKinNeutron(cosThetaPos);
+                G4double cosThetaNeutr = getAngleNeutron(enPos, kinNeutr);
+
+                fParticle = fParticleTable->FindParticle(2112); // -11 for the positron
+                fDirection.setX(cos(phiNeutr)*cosThetaNeutr);
+                fDirection.setY(sin(phiNeutr)*cosThetaNeutr);
+                fDirection.setZ(-1.0*sqrt(1.-cosThetaNeutr*cosThetaNeutr));
+
+                G4double enNeutr = kinNeutr + fParticle->GetPDGMass();
+
+                G4double pmom = sqrt(enNeutr*enNeutr - (fParticle->GetPDGMass())*(fParticle->GetPDGMass()));
+                G4double px = pmom*fDirection.x();
+                G4double py = pmom*fDirection.y();
+                G4double pz = pmom*fDirection.z();
+
+                G4PrimaryVertex*   vertex   = new G4PrimaryVertex(fPosition,0);
+                G4PrimaryParticle* particle = new G4PrimaryParticle(fParticle,px,py,pz);
+                vertex->SetPrimary( particle );
+                event->AddPrimaryVertex( vertex );
+            }
+
+
+
 	}
 
+}
+
+G4ThreeVector BxGeneratorSupernovaAntiNu::GetVParticlePositionInScint() {
+    G4ThreeVector myPos(0.,0.,0.);
+    myPos = fSPSPos->GenerateOne();
+    while( !CheckMaterial( myPos, "Scintillator" ) ) myPos = fSPSPos->GenerateOne();
+
+    return myPos;
+
+}
+
+G4bool BxGeneratorSupernovaAntiNu::CheckMaterial(G4ThreeVector pos, G4String MatName) {
+    G4bool found = false ;
+
+    G4ThreeVector null(0.,0.,0.);
+    G4ThreeVector *ptr;
+    ptr = &null;
+
+    G4VPhysicalVolume *theVolume;
+    theVolume = gNavigator->LocateGlobalPointAndSetup(pos,ptr,true);
+    G4Material *amat = theVolume->GetLogicalVolume()->GetMaterial();
+    G4String theMatName = amat->GetName();
+    if(theMatName == MatName) {
+
+        found = true ;
+        BxLog(routine) << theMatName << endlog;
+    }
+
+    return found ;
 }
 
 void BxGeneratorSupernovaAntiNu::initFunc(G4double eN) {
@@ -98,13 +193,13 @@ void BxGeneratorSupernovaAntiNu::initFunc(G4double eN) {
 
 G4double BxGeneratorSupernovaAntiNu::ShootAnglePositron() {
     G4double val = G4UniformRand();   //узнать, можно ли так делать
-    G4double deltaX,x,y;
+    G4double deltaX, x, yy;
     for (int i=0; i < dS_dc.size(); i++) {
         if(pos_probability[i] >= val) {
             deltaX = val - pos_probability[i];
-            y =pos_energyBin[i]-pos_energyBin[i-1];
-            x= pos_probability[i]-pos.probability[i-1];
-            return deltaX*y/x + pos_energyBin[i];
+            yy =pos_energyBin[i]-pos_energyBin[i-1];
+            x= pos_probability[i]-pos_probability[i-1];
+            return deltaX*yy/x + pos_energyBin[i];
         }
     }
     return -2.; //подумай

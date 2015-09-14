@@ -30,6 +30,8 @@
 #include "BxGeneratorNeutrinoC13.hh"
 //#include "BxGeneratorSterileNeutrino.hh"
 
+#include "BxGeneratorSupernovaAntiNu.hh"
+
 #include "BxGeneratorPositronium.hh"
 #include "BxOutputVertex.hh"
 
@@ -51,7 +53,7 @@ BxPrimaryGeneratorActionMessenger::BxPrimaryGeneratorActionMessenger(BxPrimaryGe
   G4String candidates 
   = "G4Gun Multi SNU SNU2 CosmicRayMuons NeutronsAtGS CERNRays Laser Timing Geneb GenebDecay G4Bx RDM SCS AntiNu AmBe NeutrinoC13 Positronium Li9He8 Sterile";
   */
-  G4String candidates="G4Gun RDM AntiNu AmBe SNU SNU2 Positronium NeutrinoC13 Li9He8 SCS Multi SterileAntiNu"; 
+  G4String candidates="G4Gun RDM AntiNu AmBe SNU SNU2 Positronium NeutrinoC13 Li9He8 SCS Multi SterileAntiNu SupernovaAntiNu";
 fSelectCmd->SetCandidates(candidates);
  }
 
@@ -131,11 +133,16 @@ void BxPrimaryGeneratorActionMessenger::SetNewValue(G4UIcommand* command, G4Stri
      } else if (newValue == "SterileAntiNu") {     
        BxOutputVertex::Get()->SetGenerator(19);   
        fGeneratorPrimary->SetBxGenerator(new BxGeneratorSterileAntiNu);
-     }/* else if (newValue == "Sterile") {     
+     } else if (newValue == "SupernovaAntiNu") {
+         //BxOutputVertex::Get()->SetGenerator(20);
+         fGeneratorPrimary->SetBxGenerator(new BxGeneratorSupernovaAntiNu);
+     }
+     /* else if (newValue == "Sterile") {
        BxOutputVertex::Get()->SetGenerator(19);   
        fGeneratorPrimary->SetBxGenerator(new BxGeneratorSterileNeutrino);
      }
      */
+
    }
 
 }
